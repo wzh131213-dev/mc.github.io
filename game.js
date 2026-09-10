@@ -1140,3 +1140,210 @@ window.gameDebug = {
   playerRef: () => player,
   setMode: (m) => { gameMode = m; renderHotbar(); renderInventoryUI(); }
 };
+
+// ---------- v6 安全版：带密码保护的 in-game 调试面板（粘到 game.js 末尾） ----------
+(function installInGameDebugPanelWithPassword() {
+  if (document.getElementById('dbg-panel-root')) return;
+
+  const PASSWORD = '@%#-¥+'; // 验证密码（按你提供的）
+  const SESSION_KEY = 'dbg_auth_v6';
+
+  // 等待游戏准备（DOM 就绪 + world/player 或 gameDebug 可用）
+  const readyCheck = () => {
+    const domReady = document.readyState === 'complete' || document.readyState === 'interactive';
+    const gameReady = (typeof world !== 'undefined' && world) && (typeof player !== 'undefined' && player);
+    const debugApiReady = !!(window.gameDebug && typeof window.gameDebug.worldRef === 'function');
+    return domReady && (gameReady || debugApiReady);
+  };
+
+  // 创建并安装面板（内部会被多次调用 guard）
+  const doInstall = () => {
+    if (document.getElementById('dbg-panel-root')) return;
+
+    // CSS
+    const css = `
+      #dbg-panel-root { position: fixed; right: 12px; top: 12px; z-index: 3000; font-family: sans-serif; }
+      #dbg-toggle-btn { background: rgba(0,0,0,0.6); color: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight:700; border:1px solid rgba(255,255,255,0.12); }
+      #dbg-panel { margin-top:8px; width:320px; background:rgba(10,12,20,0.92); color:#dbeafe; border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px; display:none; box-shadow:0 8px 30px rgba(0,0,0,0.65); }
+      #dbg-panel h4 { margin:0 0 6px 0; font-size:13px; color:#fff; }
+      .dbg-row { display:flex; justify-content:space-between; gap:8px; align-items:center; margin:6px 0; font-size:13px; }
+      .dbg-input { width:80px; padding:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.03); color:#fff; }
+      .dbg-btn { padding:6px 8px; border-radius:6px; border:none; cursor:pointer; background:#1f2937; color:#fff; font-weight:700; }
+      .dbg-small { padding:4px 6px; font-size:12px; border-radius:6px; }
+      #dbg-close { float:right; cursor:pointer; opacity:0.7; }
+      #dbg-auth-modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:4000; background:rgba(8,10,12,0.96); color:#fff; padding:14px; border-radius:10px; border:1px solid rgba(255,255,255,0.06); display:none; min-width:280px; box-shadow:0 12px 40px rgba(0,0,0,0.7); }
+      #dbg-auth-modal input { width:100%; padding:8px; margin-top:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.03); color:#fff; }
+      #dbg-auth-modal .row { display:flex; gap:8px; margin-top:10px; justify-content:flex-end; }
+      #dbg-panel .small-note { font-size:11px; color:#9ca3af; margin-top:6px; }
+      @media (max-width:600px) { #dbg-panel { width:92vw; } #dbg-panel-root { right:8px; top:8px; } }
+    `;
+    const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
+
+    // DOM 根
+    const root = document.createElement('div'); root.id = 'dbg-panel-root';
+    const toggle = document.createElement('button'); toggle.id = 'dbg-toggle-btn'; toggle.innerText = 'DBG';
+    const panel = document.createElement('div'); panel.id = 'dbg-panel';
+
+    panel.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h4>调试面板</h4><span id="dbg-close">×</span>
+      </div>
+      <div class="dbg-row"><span>坐标</span><span id="dbg-coords">0,0,0</span></div>
+      <div class="dbg-row"><span>模式</span><span id="dbg-mode">-</span></div>
+      <div class="dbg-row"><span>区块数</span><span id="dbg-chunks">0</span></div>
+      <div class="dbg-row"><span>生命/饥饿</span><span id="dbg-hp">20</span></div>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.04);margin:8px 0;" />
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <button class="dbg-btn" id="dbg-toggle-mode">切换模式</button>
+        <button class="dbg-btn" id="dbg-spawn-mob">生成怪物</button>
+        <button class="dbg-btn" id="dbg-logout" style="margin-left:auto;background:#7f1d1d">登出</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+        <input id="dbg-give-id" class="dbg-input" placeholder="物品ID" />
+        <input id="dbg-give-amt" class="dbg-input" placeholder="数量" />
+        <button class="dbg-btn dbg-small" id="dbg-give-btn" style="flex:0 0 auto">给予</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+        <input id="dbg-tp-x" class="dbg-input" placeholder="x" />
+        <input id="dbg-tp-y" class="dbg-input" placeholder="y" />
+        <input id="dbg-tp-z" class="dbg-input" placeholder="z" />
+        <button class="dbg-btn dbg-small" id="dbg-tp-btn">传送</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+        <input id="dbg-set-x" class="dbg-input" placeholder="x" />
+        <input id="dbg-set-y" class="dbg-input" placeholder="y" />
+        <input id="dbg-set-z" class="dbg-input" placeholder="z" />
+        <input id="dbg-set-id" class="dbg-input" placeholder="方块ID" />
+        <button class="dbg-btn dbg-small" id="dbg-set-btn">设块</button>
+      </div>
+      <div class="small-note">Tip: 面板受密码保护（会话内免重输）。刷新页面会丢失未保存数据。</div>
+    `;
+
+    // 密码弹窗（自定义 DOM，不用 prompt）
+    const authModal = document.createElement('div'); authModal.id = 'dbg-auth-modal';
+    authModal.innerHTML = `
+      <div style="font-weight:700">调试面板 - 密码验证</div>
+      <div style="margin-top:6px;color:#9ca3af;font-size:12px">请输入密码以打开调试面板（会话内生效）</div>
+      <input id="dbg-auth-input" type="password" placeholder="密码" />
+      <div class="row"><button id="dbg-auth-cancel" class="dbg-btn dbg-small" style="background:#374151">取消</button><button id="dbg-auth-ok" class="dbg-btn dbg-small" style="background:#065f46">确定</button></div>
+    `;
+
+    root.appendChild(toggle); root.appendChild(panel); document.body.appendChild(root);
+    document.body.appendChild(authModal);
+
+    // 元素引用
+    const closeEl = panel.querySelector('#dbg-close');
+    const coordsEl = panel.querySelector('#dbg-coords');
+    const modeEl = panel.querySelector('#dbg-mode');
+    const chunksEl = panel.querySelector('#dbg-chunks');
+    const hpEl = panel.querySelector('#dbg-hp');
+    const btnToggleMode = panel.querySelector('#dbg-toggle-mode');
+    const btnSpawnMob = panel.querySelector('#dbg-spawn-mob');
+    const btnLogout = panel.querySelector('#dbg-logout');
+    const giveId = panel.querySelector('#dbg-give-id');
+    const giveAmt = panel.querySelector('#dbg-give-amt');
+    const btnGive = panel.querySelector('#dbg-give-btn');
+    const tpX = panel.querySelector('#dbg-tp-x'), tpY = panel.querySelector('#dbg-tp-y'), tpZ = panel.querySelector('#dbg-tp-z');
+    const btnTp = panel.querySelector('#dbg-tp-btn');
+    const setX = panel.querySelector('#dbg-set-x'), setY = panel.querySelector('#dbg-set-y'), setZ = panel.querySelector('#dbg-set-z'), setId = panel.querySelector('#dbg-set-id');
+    const btnSet = panel.querySelector('#dbg-set-btn');
+
+    const authInput = document.getElementById('dbg-auth-input');
+    const authOk = document.getElementById('dbg-auth-ok');
+    const authCancel = document.getElementById('dbg-auth-cancel');
+
+    // helpers
+    const isAuthed = () => sessionStorage.getItem(SESSION_KEY) === '1';
+    const setAuthed = (v) => { if (v) sessionStorage.setItem(SESSION_KEY, '1'); else sessionStorage.removeItem(SESSION_KEY); };
+
+    // show auth modal
+    const showAuthModal = () => {
+      authModal.style.display = 'block';
+      authInput.value = '';
+      authInput.focus();
+    };
+    const hideAuthModal = () => { authModal.style.display = 'none'; };
+
+    // toggle click: check auth
+    toggle.addEventListener('click', () => {
+      if (isAuthed()) {
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+      } else {
+        showAuthModal();
+      }
+    });
+
+    authCancel.addEventListener('click', () => { hideAuthModal(); });
+    authOk.addEventListener('click', () => {
+      const val = authInput.value || '';
+      // exact match with PASSWORD
+      if (val === PASSWORD) {
+        setAuthed(true);
+        hideAuthModal();
+        panel.style.display = 'block';
+      } else {
+        // 错误反馈（简单闪烁）
+        authInput.style.borderColor = '#b91c1c';
+        setTimeout(()=>{ authInput.style.borderColor=''; }, 900);
+        authInput.focus();
+      }
+    });
+
+    // also allow Enter key in input
+    authInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') authOk.click(); });
+
+    // panel handlers
+    closeEl.addEventListener('click', () => { panel.style.display = 'none'; });
+    btnToggleMode.addEventListener('click', () => {
+      const newMode = (gameMode === 'creative') ? 'survival' : 'creative';
+      if (typeof window.gameDebug?.setMode === 'function') window.gameDebug.setMode(newMode);
+      else { gameMode = newMode; renderHotbar(); renderInventoryUI(); }
+      const flyBtn = document.getElementById('fly-btn'); if (flyBtn) flyBtn.style.display = (newMode === 'creative') ? 'flex' : 'none';
+    });
+    btnSpawnMob.addEventListener('click', () => {
+      if (!player || !scene) return;
+      const mob = new THREE.Mesh(new THREE.BoxGeometry(0.8,1.8,0.8), new THREE.MeshLambertMaterial({ color: 0x15803d }));
+      mob.position.set(player.position.x + 2, player.position.y + 1, player.position.z + 2);
+      mob.userData = { hp:3, lastAttack:0 }; scene.add(mob); mobs.push(mob);
+    });
+
+    btnGive.addEventListener('click', () => {
+      const id = Number(giveId.value) || 0; const amt = Math.max(1, Number(giveAmt.value) || 1);
+      if (!id) return alert('请输入有效物品ID');
+      inventory[id] = (inventory[id] || 0) + amt;
+      renderHotbar(); renderInventoryUI();
+    });
+
+    btnTp.addEventListener('click', () => {
+      const x = Number(tpX.value), y = Number(tpY.value), z = Number(tpZ.value);
+      if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) && player) { player.position.set(x,y,z); coordsEl.innerText = `${Math.floor(x)}, ${Math.floor(y)}, ${Math.floor(z)}`; }
+      else alert('请输入有效坐标并确保玩家已初始化');
+    });
+
+    btnSet.addEventListener('click', () => {
+      const x = parseInt(setX.value,10), y = parseInt(setY.value,10), z = parseInt(setZ.value,10), id = parseInt(setId.value,10);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z) || !Number.isFinite(id)) return alert('请输入有效的 x,y,z, id');
+      world?.setVoxel(x,y,z,id);
+    });
+
+    btnLogout.addEventListener('click', () => { setAuthed(false); panel.style.display = 'none'; alert('已登出，下一次打开需要密码'); });
+
+    // live updater
+    const updatePanel = () => {
+      if (!player) return;
+      coordsEl.innerText = `${Math.floor(player.position.x)}, ${Math.floor(player.position.y)}, ${Math.floor(player.position.z)}`;
+      modeEl.innerText = gameMode || '-';
+      chunksEl.innerText = world ? (world.chunkMeshes.size || 0) : '0';
+      hpEl.innerText = `${hp ?? '-'} / ${MAX_HP ?? '-' }`;
+    };
+    const updater = setInterval(updatePanel, 300);
+    window.addEventListener('beforeunload', () => clearInterval(updater));
+    window.addEventListener('keydown', (e) => { if (e.code === 'F3') panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; });
+  }; // doInstall end
+
+  // Poll until ready (timeout 30s)
+  let tries = 0; const maxTries = 100; const interval = setInterval(() => {
+    if (readyCheck()) { clearInterval(interval); try { doInstall(); } catch (err) { console.warn('dbg panel install failed', err); } }
+    else { tries++; if (tries >= maxTries) { clearInterval(interval); console.warn('dbg panel: game not ready within timeout'); } }
+  }, 300);
+})();
