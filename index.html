@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no" />
+  <title>手机版 3D 我的世界 - 移动优先增强版</title>
+
+  <!-- 样式 -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- 三方依赖 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+</head>
+<body>
+  <div id="crosshair">+</div>
+  <div id="mining-progress-container"><div id="mining-progress-bar"></div></div>
+
+  <div id="stats-overlay">FPS: <span id="fps-val">0</span> | 区块: <span id="chunk-val">0</span> | XYZ: <span id="coords-val">0, 0, 0</span></div>
+
+  <div id="death-screen" class="modal hidden">
+    <h1>你阵亡了！</h1>
+    <button id="respawn-btn" class="btn">重新生还</button>
+  </div>
+
+  <div id="main-menu" class="modal">
+    <div class="mc-title">MINECRAFT</div>
+    <div class="mc-author">生存 · 创造 · 工作台 · 工具 · 第三人称 · 自动存档</div>
+    <div class="mc-subtitle">移动优先 · 触控优化 · DDA 射线 · 3D 视角</div>
+
+    <div class="menu-card-container">
+      <div class="mode-card creative" id="card-creative">
+        <div class="card-icon">🟢</div>
+        <div class="card-title" style="color: #4ade80;">创造模式</div>
+        <div class="card-desc">无限方块与工具资源 | 自由飞行</div>
+      </div>
+      <div class="mode-card survival" id="card-survival">
+        <div class="card-icon">🔴</div>
+        <div class="card-title" style="color: #f87171;">生存模式</div>
+        <div class="card-desc">手动挖掘方块最慢，升级工具可加速挖掘</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="inventory-modal" class="modal hidden">
+    <div class="inv-container">
+      <div class="inv-header">
+        <span class="inv-title">🎒 随身背包与基础合成</span>
+        <button class="inv-close btn" id="inv-close-btn">✕ 关闭</button>
+      </div>
+      <div class="crafting-section">
+        <div class="crafting-title">📦 基础合成（随身）</div>
+        <div class="crafting-recipes" id="crafting-recipes-list"></div>
+      </div>
+
+      <div class="inv-hotbar-section">
+        <div class="inv-hotbar-title">🏷️ 装备物品栏 (点击拿起/放下)</div>
+        <div class="inv-hotbar-grid" id="inv-hotbar-content"></div>
+      </div>
+
+      <div class="inv-grid" id="inv-grid-content"></div>
+    </div>
+  </div>
+
+  <div id="crafting-table-modal" class="modal hidden">
+    <button class="crafting-back-btn btn" id="crafting-table-close-btn">← 返回游戏</button>
+    <div class="crafting-fullscreen-container">
+      <div class="inv-title" style="font-size: 20px; text-align: center;">🪑 工作台 - 高级合成</div>
+      <div class="crafting-section">
+        <div class="crafting-title">⚙️ 工作台配方</div>
+        <div class="crafting-recipes" id="advanced-recipes-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="in-game-ui" class="hidden">
+    <div id="bottom-ui-group">
+      <div id="status-container" style="display:none;">
+        <div id="health-bar"></div>
+        <div style="font-size:12px;color:#facc15;font-weight:bold;">
+          🗓️ 第 <span id="day-count-val">1</span> 天 (<span id="time-period-val">白天</span>)
+        </div>
+        <div id="hunger-bar-container">
+          <span>🍖 饥饿:</span>
+          <div id="hunger-bar-bg"><div id="hunger-bar-fill"></div></div>
+          <span id="hunger-val-text">100/100</span>
+        </div>
+      </div>
+
+      <div id="hotbar"></div>
+      <button id="pause-btn" class="btn">⚙️ 返回菜单</button>
+    </div>
+
+    <div class="touch-ui">
+      <div id="joystick-zone"><div id="joystick-knob"></div></div>
+      <button id="save-btn" class="action-btn" title="存档">💾</button>
+      <div id="touch-look-zone"></div>
+      <div id="mobile-jump-only" class="action-btn">跳跃</div>
+
+      <div class="action-btn" id="nightvision-btn" title="夜视">夜视</div>
+      <div class="action-btn" id="view-toggle-btn" title="视角">视角</div>
+      <div class="action-btn" id="time-btn" title="调时">调时</div>
+      <div class="action-btn" id="break-btn" title="挖掘">挖掘</div>
+      <div class="action-btn" id="place-btn" title="放置">放置</div>
+      <div class="action-btn" id="inv-toggle-btn" title="背包">背包</div>
+
+      <div class="action-btn" id="fly-btn" title="飞行">飞行</div>
+      <div class="action-btn" id="fly-up-btn" title="飞行上升">▲</div>
+      <div class="action-btn" id="fly-down-btn" title="飞行下降">▼</div>
+    </div>
+  </div>
+
+  <script src="game.js" defer></script>
+</body>
+</html>
