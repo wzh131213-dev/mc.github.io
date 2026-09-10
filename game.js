@@ -1,5 +1,4 @@
-/* game.js（v3）—— 统一、移动优先、创造/生存区分、右下按钮、移除保存按钮
-   说明：
+/* game.js：
    - 依赖 three.js 和 simplex-noise（index.html 已加载）
    - 初始化在 DOMContentLoaded
    - 安全绑定事件（元素存在性检查）
