@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no" />
-  <title>手机版 3D 我的世界 - 移动优先增强版</title>
+  <title>手机版 3D 我的世界 - v3 移动优先</title>
 
-  <!-- 样式 -->
   <link rel="stylesheet" href="styles.css">
 
-  <!-- 三方依赖 -->
+  <!-- 依赖：three.js 和 simplex-noise（必须先加载） -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+  <!-- 注意：页面中只应加载此一份 game.js（下面），不要再内联或重复其它版本 -->
 </head>
 <body>
   <div id="crosshair">+</div>
@@ -25,19 +25,19 @@
 
   <div id="main-menu" class="modal">
     <div class="mc-title">MINECRAFT</div>
-    <div class="mc-author">生存 · 创造 · 工作台 · 工具 · 第三人称 · 自动存档</div>
+    <div class="mc-author">生存 · 创造 · 工作台 · 工具 · 第三人称</div>
     <div class="mc-subtitle">移动优先 · 触控优化 · DDA 射线 · 3D 视角</div>
 
     <div class="menu-card-container">
       <div class="mode-card creative" id="card-creative">
         <div class="card-icon">🟢</div>
         <div class="card-title" style="color: #4ade80;">创造模式</div>
-        <div class="card-desc">无限方块与工具资源 | 自由飞行</div>
+        <div class="card-desc">无限物品 · 自由飞行</div>
       </div>
       <div class="mode-card survival" id="card-survival">
         <div class="card-icon">🔴</div>
         <div class="card-title" style="color: #f87171;">生存模式</div>
-        <div class="card-desc">手动挖掘方块最慢，升级工具可加速挖掘</div>
+        <div class="card-desc">资源有限 · 怪物与饥饿</div>
       </div>
     </div>
   </div>
@@ -91,19 +91,21 @@
       <button id="pause-btn" class="btn">⚙️ 返回菜单</button>
     </div>
 
+    <!-- 摇杆（左下） -->
     <div class="touch-ui">
       <div id="joystick-zone"><div id="joystick-knob"></div></div>
-      <button id="save-btn" class="action-btn" title="存档">💾</button>
       <div id="touch-look-zone"></div>
-      <div id="mobile-jump-only" class="action-btn">跳跃</div>
+    </div>
 
+    <!-- 操作按钮全部移动到右下角 -->
+    <div id="action-buttons">
+      <div id="mobile-jump-only" class="action-btn">跳跃</div>
       <div class="action-btn" id="nightvision-btn" title="夜视">夜视</div>
       <div class="action-btn" id="view-toggle-btn" title="视角">视角</div>
       <div class="action-btn" id="time-btn" title="调时">调时</div>
       <div class="action-btn" id="break-btn" title="挖掘">挖掘</div>
       <div class="action-btn" id="place-btn" title="放置">放置</div>
       <div class="action-btn" id="inv-toggle-btn" title="背包">背包</div>
-
       <div class="action-btn" id="fly-btn" title="飞行">飞行</div>
       <div class="action-btn" id="fly-up-btn" title="飞行上升">▲</div>
       <div class="action-btn" id="fly-down-btn" title="飞行下降">▼</div>
