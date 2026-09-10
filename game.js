@@ -1,5 +1,8 @@
-// game.js - 移动优先（mobile-first）主逻辑
-// 说明：基于之前的版本，自动检测移动设备并为手机优化渲染、UI 和控制体验。
+/* game.js - 已修正：
+   - safe UI event binding（绑定前检测元素存在）
+   - 初始化延后到 DOMContentLoaded，启动时强制设置 UI 初始可见状态
+   移动优先版本基础上仅调整初始化、事件绑定，保留原功能与结构（区块/矿物/背包/熔炉/挖掘等）。
+*/
 
 /* ========= 设备检测与配置（移动优先） ========= */
 const isMobile = (typeof window !== 'undefined') && (
@@ -7,10 +10,10 @@ const isMobile = (typeof window !== 'undefined') && (
   || ('ontouchstart' in window && navigator.maxTouchPoints > 0)
 );
 
-// 针对移动设备调整参数（降低开销，增大触控目标）
+// 调整参数（移动优先）
 let CHUNK_SIZE_X = 16, CHUNK_SIZE_Z = 16;
-let CHUNK_SIZE_Y = isMobile ? 96 : 124;      // 移动端降低高度
-let RENDER_DISTANCE = isMobile ? 1 : 2;      // 移动端更短渲染距离
+let CHUNK_SIZE_Y = isMobile ? 96 : 124;
+let RENDER_DISTANCE = isMobile ? 1 : 2;
 const MAX_RENDER_PIXEL_RATIO = isMobile ? 1 : Math.min(2, window.devicePixelRatio || 1);
 
 /* ========= 方块定义（保持兼容） ========= */
@@ -52,18 +55,18 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
 const dayColor = new THREE.Color(0x87ceeb);
 const nightColor = new THREE.Color(0x0f172a);
 
-/* ========= 其余全局状态（与原逻辑兼容） ========= */
+/* ========= 全局状态 ========= */
 let world, player, playerMesh;
 let isInGame = false, isThirdPerson = false, gameMode = 'creative';
 let isFlying = false, flyVerticalState = 0;
 let selectedBlockId = 1;
 let hotbarSlots = [1,2,3,4,5,6,13,14,20];
 let inventory = {1:10,2:10,3:10,4:10,5:10,6:10,13:1,14:1,20:5,22:5};
-let heldItem = null; // 拾取/放置
+let heldItem = null;
 let mobs = [];
 let lastSpawnTime = 0;
 
-/* ========= 面与 DDA 射线（保留原实现） ========= */
+/* ========= 面集合与 DDA 射线 ========= */
 const FACES = [
   { dir:[0,0,1],  corners:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]] },
   { dir:[0,0,-1], corners:[[1,0,0],[0,0,0],[0,1,0],[1,1,0]] },
@@ -101,7 +104,7 @@ function raycastVoxelDDA(origin, direction, maxDistance = 6.0) {
   return { hit:false };
 }
 
-/* ========= 世界管理（生成/网格重建） ========= */
+/* ========= WorldManager（区块生成与网格） ========= */
 class WorldManager {
   constructor() {
     this.chunks = new Map();
@@ -174,7 +177,7 @@ class WorldManager {
       }
     }
 
-    // 矿物分布（同原逻辑）
+    // 矿物分布（较小区块仍适用）
     const oreTypes = [23,24,25,26];
     oreTypes.forEach((oreType, oreIndex) => {
       const targetCount = 90;
@@ -205,7 +208,7 @@ class WorldManager {
       }
     });
 
-    // 简单树木生成
+    // 简单树生成
     const seedRandom = (n) => { const x=Math.sin(n)*10000; return x - Math.floor(x); };
     const treeSeed = Math.abs(cx*73856093 ^ cz*19349663);
     const treeCount = Math.floor(seedRandom(treeSeed)*2) + 1;
@@ -295,7 +298,7 @@ class WorldManager {
   }
 }
 
-/* ========= 玩家实体（碰撞/运动） ========= */
+/* ========= PlayerEntity ========= */
 class PlayerEntity {
   constructor(x,y,z) {
     this.position = new THREE.Vector3(x,y,z);
@@ -304,8 +307,7 @@ class PlayerEntity {
     this.onGround = false;
   }
   getAABB(pos = this.position) {
-    const halfW = this.width / 2;
-    const h = this.height;
+    const halfW = this.width / 2; const h = this.height;
     return { minX: pos.x - halfW, maxX: pos.x + halfW, minY: pos.y + 0.001, maxY: pos.y + h, minZ: pos.z - halfW, maxZ: pos.z + halfW };
   }
   checkCollision(aabb) {
@@ -346,8 +348,12 @@ class PlayerEntity {
   }
 }
 
-/* ========= UI/背包/合成/熔炉 等（保留并优化触控） ========= */
+/* ========= UI / 背包 / 合成 / 熔炉（与之前逻辑兼容） ========= */
+/* 为篇幅和稳定性考虑，renderHotbar/renderInventoryUI/furnace 等函数保持原实现逻辑，
+   这里直接定义但不重复注释（与你之前版本兼容）。 */
+
 let heldItemGlobal = null;
+
 function renderHotbar() {
   const hotbar = document.getElementById('hotbar'); if (!hotbar) return;
   hotbar.innerHTML = '';
@@ -359,7 +365,7 @@ function renderHotbar() {
     if (def) {
       const icon = document.createElement('div'); icon.className = 'slot-icon'; icon.style.backgroundColor = `rgb(${def.color.join(',')})`;
       const name = document.createElement('div'); name.innerText = def.name; name.style.fontSize='11px';
-      const count = document.createElement('div'); count.className='slot-count'; count.innerText = isMobile || gameMode==='creative' ? '∞' : (inventory[id]||0);
+      const count = document.createElement('div'); count.className='slot-count'; count.innerText = (isMobile || gameMode==='creative') ? '∞' : (inventory[id]||0);
       slot.appendChild(icon); slot.appendChild(name); slot.appendChild(count);
     } else slot.innerText = '空';
     slot.addEventListener('click', ()=>{ selectedBlockId = id; renderHotbar(); });
@@ -371,7 +377,6 @@ function renderHotbar() {
 }
 
 function handleSlotDrop(draggedId, targetSlotIndex) {
-  const existingId = hotbarSlots[targetSlotIndex];
   hotbarSlots[targetSlotIndex] = draggedId;
   selectedBlockId = draggedId;
   renderHotbar();
@@ -417,7 +422,6 @@ function renderInventoryUI() {
     grid.appendChild(slot);
   });
 
-  // 基本合成
   const recipesList = document.getElementById('crafting-recipes-list');
   if (recipesList) {
     recipesList.innerHTML = '';
@@ -459,7 +463,7 @@ function handleInventorySlotClick(clickedId, targetType, targetIndex) {
   renderInventoryUI(); renderHotbar();
 }
 
-/* ========= 熔炉（保留） ========= */
+/* ========= 熔炉（保留实现） ========= */
 let furnaceState = { open:false, input:0, inputCount:0, fuel:0, fuelCount:0, output:0, outputCount:0, progress:0, burn:0, maxBurn:0 };
 function smeltRecipe(id) {
   if (id===24) return { out:36, count:1 };
@@ -537,7 +541,7 @@ function tickFurnace(dt) {
   if (furnaceState.open) renderFurnacePanel();
 }
 
-/* ========= 挖掘/放置流程（保留并优化） ========= */
+/* ========= 挖掘/放置 ========= */
 let miningTarget = null, miningElapsed = 0, miningTotalTime = 1;
 function getBlockBreakTime(voxelType, heldItemId) {
   const blockDef = BLOCK_DEFS[voxelType];
@@ -575,127 +579,27 @@ function handleBlockPlaceAtHit(hitResult) {
   }
 }
 
-/* ========= 输入/触控/摇杆（移动端优先） ========= */
+/* ========= 输入 / 摇杆 / 触控 ========= */
 let yaw = 0, pitch = 0;
 const keys = {};
 let joystickPointerId = null, joystickOrigin = {x:0,y:0}, joystickMove = {x:0,y:0};
 let lookPointerId = null, lastLookPos = {x:0,y:0};
 
-function setupUIEvents() {
-  document.getElementById('card-creative').addEventListener('click', ()=>startGame('creative'));
-  document.getElementById('card-survival').addEventListener('click', ()=>startGame('survival'));
-  document.getElementById('respawn-btn').addEventListener('click', respawnPlayer);
-  document.getElementById('pause-btn').addEventListener('click', showMainMenu);
-  document.getElementById('inv-toggle-btn').addEventListener('click', toggleInventory);
-  document.getElementById('inv-close-btn').addEventListener('click', toggleInventory);
-  document.getElementById('crafting-table-close-btn').addEventListener('click', toggleCraftingTable);
-  document.getElementById('save-btn')?.addEventListener('click', saveGame);
-  document.getElementById('view-toggle-btn')?.addEventListener('click', (e)=>{ e.stopPropagation(); toggleThirdPerson(); });
-
-  document.getElementById('nightvision-btn')?.addEventListener('click', ()=>{
-    const el = document.getElementById('nightvision-btn'); if (!el) return;
-    isNightVisionOn = !isNightVisionOn;
-    el.style.background = isNightVisionOn ? 'rgba(34,197,94,.8)' : 'rgba(126,34,206,.8)';
-  });
-
-  const breakBtn = document.getElementById('break-btn');
-  breakBtn.addEventListener('touchstart',(e)=>{ e.preventDefault(); isBreakBtnHeld = true; }, {passive:false});
-  breakBtn.addEventListener('touchend', ()=>{ isBreakBtnHeld = false; });
-  breakBtn.addEventListener('touchcancel', ()=>{ isBreakBtnHeld = false; });
-
-  document.getElementById('place-btn').addEventListener('touchstart', (e)=>{ e.preventDefault(); handlePlaceAction(); }, {passive:false});
-  document.getElementById('place-btn').addEventListener('click', handlePlaceAction);
-
-  // 飞行按钮
-  document.getElementById('fly-btn')?.addEventListener('click', ()=>{
-    isFlying = !isFlying;
-    document.getElementById('fly-btn').style.background = isFlying ? 'rgba(34,197,94,.8)' : 'rgba(168,85,247,.6)';
-    document.getElementById('fly-up-btn').style.display = isFlying ? 'flex' : 'none';
-    document.getElementById('fly-down-btn').style.display = isFlying ? 'flex' : 'none';
-  });
-  const flyUp = document.getElementById('fly-up-btn'); if (flyUp) { flyUp.addEventListener('touchstart',(e)=>{ e.preventDefault(); flyVerticalState = 1; }, {passive:false}); flyUp.addEventListener('touchend', ()=>{ flyVerticalState=0; }); flyUp.addEventListener('mousedown', ()=> flyVerticalState=1); flyUp.addEventListener('mouseup', ()=> flyVerticalState=0); }
-  const flyDown = document.getElementById('fly-down-btn'); if (flyDown) { flyDown.addEventListener('touchstart',(e)=>{ e.preventDefault(); flyVerticalState = -1; }, {passive:false}); flyDown.addEventListener('touchend', ()=>{ flyVerticalState=0; }); flyDown.addEventListener('mousedown', ()=> flyVerticalState=-1); flyDown.addEventListener('mouseup', ()=> flyVerticalState=0); }
-
-  // 键盘（桌面优先）
-  window.addEventListener('keydown', (e)=>{
-    keys[e.code] = true;
-    if (e.code === 'KeyE') { if (isCraftingTableOpen) toggleCraftingTable(); else toggleInventory(); }
-    if (e.code === 'Space' && player) player.jump();
-    if (/^Digit[1-9]$/.test(e.code)) {
-      const slot = Number(e.code.slice(-1))-1;
-      if (slot >=0 && slot < hotbarSlots.length) { selectedBlockId = hotbarSlots[slot]; renderHotbar(); }
-    }
-    if (e.code === 'KeyV') toggleThirdPerson();
-    if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight')) isSprinting = true;
-    if ((e.code === 'ControlLeft' || e.code === 'ControlRight')) isCrouching = true;
-    if (e.code === 'KeyF') consumeSelectedFood();
-  });
-  window.addEventListener('keyup', (e)=>{ keys[e.code]=false; if (e.code==='ShiftLeft' || e.code==='ShiftRight') isSprinting=false; if (e.code==='ControlLeft' || e.code==='ControlRight') isCrouching=false; });
-
-  // 摇杆（触控）
-  const joyZone = document.getElementById('joystick-zone'), joyKnob = document.getElementById('joystick-knob');
-  if (joyZone) {
-    joyZone.addEventListener('touchstart', (e)=>{ e.preventDefault(); const t = e.targetTouches[0]; joystickPointerId = t.identifier; const rect = joyZone.getBoundingClientRect(); joystickOrigin={ x: rect.left + rect.width/2, y: rect.top + rect.height/2 }; updateJoystick(t.clientX, t.clientY); }, {passive:false});
-    joyZone.addEventListener('touchmove', (e)=>{ e.preventDefault(); for (let i=0;i<e.changedTouches.length;i++){ if (e.changedTouches[i].identifier === joystickPointerId) { updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY); break; } } }, {passive:false});
-    const resetJoy = (e)=>{ for (let i=0;i<e.changedTouches.length;i++){ if (e.changedTouches[i].identifier === joystickPointerId) { joystickPointerId=null; joystickMove={x:0,y:0}; if (joyKnob) joyKnob.style.transform='translate(0px,0px)'; break; } } };
-    joyZone.addEventListener('touchend', resetJoy); joyZone.addEventListener('touchcancel', resetJoy);
-  }
-  function updateJoystick(clientX, clientY) {
-    let dx = clientX - joystickOrigin.x, dy = clientY - joystickOrigin.y;
-    const maxDist = 48; const dist = Math.hypot(dx,dy);
-    if (dist > maxDist) { dx = dx/dist * maxDist; dy = dy/dist * maxDist; }
-    if (joyKnob) joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-    joystickMove = { x: dx / maxDist, y: dy / maxDist };
-  }
-
-  // 触摸视角（移动端主控）
-  const lookZone = document.getElementById('touch-look-zone');
-  if (lookZone) {
-    lookZone.addEventListener('touchstart', (e)=>{ const t = e.targetTouches[0]; lookPointerId = t.identifier; lastLookPos = { x:t.clientX, y:t.clientY }; });
-    lookZone.addEventListener('touchmove', (e)=>{ for (let i=0;i<e.changedTouches.length;i++){ const t=e.changedTouches[i]; if (t.identifier===lookPointerId){ const dx = t.clientX - lastLookPos.x, dy = t.clientY - lastLookPos.y; yaw -= dx * 0.005; pitch -= dy * 0.005; pitch = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, pitch)); lastLookPos = {x:t.clientX,y:t.clientY}; break; } } });
-    const resetLook = (e)=>{ for (let i=0;i<e.changedTouches.length;i++){ if (e.changedTouches[i].identifier===lookPointerId) { lookPointerId=null; break; } } };
-    lookZone.addEventListener('touchend', resetLook); lookZone.addEventListener('touchcancel', resetLook);
-  }
-
-  // 鼠标移动（仅桌面有效） - 禁用在移动端请求指针锁
-  if (!isMobile) {
-    window.addEventListener('mousemove', (e)=>{
-      if (document.pointerLockElement === document.body) {
-        yaw -= e.movementX * 0.003; pitch -= e.movementY * 0.003;
-        pitch = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, pitch));
-      }
-    });
-    window.addEventListener('mousedown', (e)=>{
-      if (isInGame && !isInventoryOpen && !isCraftingTableOpen) {
-        if (document.pointerLockElement !== document.body) document.body.requestPointerLock?.();
-        else {
-          if (e.button === 0) isLeftMouseDown = true;
-          if (e.button === 2) handlePlaceAction();
-        }
-      }
-    });
-    window.addEventListener('mouseup', (e)=>{ if (e.button === 0) isLeftMouseDown=false; });
-  } else {
-    // 移动端：通过触摸按钮进行挖掘，禁用 pointerLock 交互
-    window.addEventListener('touchstart', (e)=>{/* 防止触摸导致浏览器弹性 */}, {passive:true});
-  }
-
-  // 跳跃按钮（移动）
-  const mobileJumpBtn = document.getElementById('mobile-jump-only');
-  if (mobileJumpBtn) {
-    mobileJumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (player) player.jump(); }, { passive:false });
-    mobileJumpBtn.addEventListener('click', () => { if (player) player.jump(); });
-  }
+function updateJoystick(clientX, clientY, knobEl) {
+  let dx = clientX - joystickOrigin.x, dy = clientY - joystickOrigin.y;
+  const maxDist = 48; const dist = Math.hypot(dx,dy);
+  if (dist > maxDist) { dx = dx/dist * maxDist; dy = dy/dist * maxDist; }
+  if (knobEl) knobEl.style.transform = `translate(${dx}px, ${dy}px)`;
+  joystickMove = { x: dx / maxDist, y: dy / maxDist };
 }
 
-/* ========= 存档/加载（同原） ========= */
+/* ========= 存档/加载 ========= */
 const gameSaveKey = 'mini_mc_save_mobile_v1';
 function saveGame() {
   try {
     const chunks = {}; for (const [k,v] of world.chunks) chunks[k] = Array.from(v);
     const s = { mode: gameMode, player: player.position.toArray(), yaw, pitch, inventory, hotbarSlots, selectedBlockId, chunks };
     localStorage.setItem(gameSaveKey, JSON.stringify(s));
-    if (!isMobile) console.log('存档已保存');
   } catch (e) { console.warn('存档失败', e); }
 }
 function loadGame() {
@@ -716,15 +620,14 @@ function loadGame() {
   } catch (e) { console.warn('读取存档失败', e); return false; }
 }
 
-/* ========= 启动/世界初始化（移动端降低像素比/抗锯齿） ========= */
+/* ========= 引擎初始化（延后执行） ========= */
 function initEngine() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87ceeb);
   scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 
-  // 移动端禁用 antialias，可降低 GPU 开销
-  renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" });
+  renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: isMobile ? 'low-power' : 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(MAX_RENDER_PIXEL_RATIO);
   document.body.appendChild(renderer.domElement);
@@ -735,7 +638,6 @@ function initEngine() {
 
   world = new WorldManager();
 
-  // 预生成较小半径区块（移动端更小）
   const spawnChunkRadius = RENDER_DISTANCE;
   for (let cx = -spawnChunkRadius; cx <= spawnChunkRadius; cx++) {
     for (let cz = -spawnChunkRadius; cz <= spawnChunkRadius; cz++) {
@@ -761,11 +663,10 @@ function initEngine() {
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.62, 0.62), skinMat); head.position.y = 1.7;
   playerMesh.add(body, head); playerMesh.visible = false; scene.add(playerMesh);
 
-  setupUIEvents();
   window.addEventListener('resize', onWindowResize);
 }
 
-/* ========= 世界更新/区块加载 ========= */
+/* ========= 世界加载辅助 ========= */
 function updateWorldChunks() {
   if (!world || !player) return;
   const pcx = Math.floor(player.position.x / CHUNK_SIZE_X);
@@ -781,7 +682,7 @@ function updateWorldChunks() {
   }
 }
 
-/* ========= 矿工流程更新（同原） ========= */
+/* ========= 矿工 / 挖掘更新 ========= */
 function resetMiningProcess() { miningTarget=null; miningElapsed=0; const cont=document.getElementById('mining-progress-container'); if (cont) cont.style.display='none'; }
 function updateMiningProcess(delta) {
   const dir = new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw)*Math.cos(pitch)).normalize();
@@ -818,7 +719,7 @@ function updateMiningProcess(delta) {
   } else resetMiningProcess();
 }
 
-/* ========= 放置 / 交互入口 ========= */
+/* ========= 放置 / 交互 ========= */
 function handlePlaceAction() {
   if (!isInGame || isInventoryOpen || isCraftingTableOpen || !player) return;
   const dir = new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw)*Math.cos(pitch)).normalize();
@@ -842,16 +743,12 @@ function handleInstantBreak() {
   }
 }
 
-/* ========= 引擎循环 / 昼夜 / 怪物 / 饥饿等 ========= */
-let lastTime = performance.now();
-let frameCount = 0, fpsTime = 0;
-let isLeftMouseDown = false, isBreakBtnHeld = false, creativeBreakCooldown = 0;
-let isSprinting = false, isCrouching = false, isInventoryOpen = false, isCraftingTableOpen = false;
+/* ========= 日夜 / 怪物 / 饥饿 ========= */
+let dayTime = 0, survivalDays = 1;
+const DAY_DURATION = 120.0;
 let isNightVisionOn = false;
 const MAX_HP = 20, MAX_HUNGER = 100;
 let hp = MAX_HP, hunger = MAX_HUNGER, hungerTimer = 0, starvationTimer = 0;
-let dayTime = 0, survivalDays = 1;
-const DAY_DURATION = 120.0;
 
 function updateDayNightCycle(delta) {
   const old = dayTime;
@@ -913,8 +810,12 @@ function consumeSelectedFood() {
   inventory[selectedBlockId]--; starvationTimer = 0; hungerTimer = 0; updateHungerUI(); updateHealthUI(); renderHotbar(); renderInventoryUI();
 }
 
-/* ========= 动画循环（降低移动端渲染压力） ========= */
+/* ========= 动画循环 ========= */
 let lastAnimTime = performance.now();
+let frameCount = 0, fpsTime = 0;
+let isLeftMouseDown = false, isBreakBtnHeld = false, creativeBreakCooldown = 0;
+let isSprinting = false, isCrouching = false, isInventoryOpen = false, isCraftingTableOpen = false;
+
 function animate() {
   requestAnimationFrame(animate);
   const now = performance.now();
@@ -923,8 +824,8 @@ function animate() {
 
   frameCount++; fpsTime += delta;
   if (fpsTime >= 1.0) {
-    document.getElementById('fps-val').innerText = Math.round(frameCount / fpsTime);
-    document.getElementById('chunk-val').innerText = world ? world.chunkMeshes.size : 0;
+    const fpsEl = document.getElementById('fps-val'); if (fpsEl) fpsEl.innerText = Math.round(frameCount / fpsTime);
+    const chunkEl = document.getElementById('chunk-val'); if (chunkEl) chunkEl.innerText = world ? world.chunkMeshes.size : 0;
     frameCount = 0; fpsTime = 0;
   }
 
@@ -958,7 +859,7 @@ function animate() {
       camera.rotation.y = yaw; camera.rotation.x = pitch;
     }
 
-    document.getElementById('coords-val').innerText = `${Math.floor(player.position.x)}, ${Math.floor(player.position.y)}, ${Math.floor(player.position.z)}`;
+    const coordsEl = document.getElementById('coords-val'); if (coordsEl) coordsEl.innerText = `${Math.floor(player.position.x)}, ${Math.floor(player.position.y)}, ${Math.floor(player.position.z)}`;
 
     updateWorldChunks();
     updateDayNightCycle(delta);
@@ -976,7 +877,7 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-/* ========= 窗口处理 ========= */
+/* ========= 窗口调整 ========= */
 function onWindowResize() {
   if (!camera || !renderer) return;
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -984,45 +885,286 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-/* ========= UI 控制（显示/隐藏） ========= */
+/* ========= 安全绑定 UI 事件（在 DOMContentLoaded 调用） ========= */
+function setupUIEvents() {
+  // 安全获取元素（若页面有差异也不会抛错）
+  const cardCreative = document.getElementById('card-creative');
+  const cardSurvival = document.getElementById('card-survival');
+  const respawnBtn = document.getElementById('respawn-btn');
+  const pauseBtn = document.getElementById('pause-btn');
+  const invToggleBtn = document.getElementById('inv-toggle-btn');
+  const invCloseBtn = document.getElementById('inv-close-btn');
+  const craftingCloseBtn = document.getElementById('crafting-table-close-btn');
+  const saveBtn = document.getElementById('save-btn');
+  const viewToggleBtn = document.getElementById('view-toggle-btn');
+  const nightvisionBtn = document.getElementById('nightvision-btn');
+  const breakBtn = document.getElementById('break-btn');
+  const placeBtn = document.getElementById('place-btn');
+  const flyBtn = document.getElementById('fly-btn');
+  const flyUp = document.getElementById('fly-up-btn');
+  const flyDown = document.getElementById('fly-down-btn');
+  const mobileJumpBtn = document.getElementById('mobile-jump-only');
+  const joystickZone = document.getElementById('joystick-zone');
+  const joystickKnob = document.getElementById('joystick-knob');
+  const lookZone = document.getElementById('touch-look-zone');
+
+  if (cardCreative) cardCreative.addEventListener('click', () => startGame('creative'));
+  if (cardSurvival) cardSurvival.addEventListener('click', () => startGame('survival'));
+  if (respawnBtn) respawnBtn.addEventListener('click', respawnPlayer);
+  if (pauseBtn) pauseBtn.addEventListener('click', showMainMenu);
+  if (invToggleBtn) invToggleBtn.addEventListener('click', toggleInventory);
+  if (invCloseBtn) invCloseBtn.addEventListener('click', toggleInventory);
+  if (craftingCloseBtn) craftingCloseBtn.addEventListener('click', toggleCraftingTable);
+  if (saveBtn) saveBtn.addEventListener('click', saveGame);
+  if (viewToggleBtn) viewToggleBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleThirdPerson(); });
+  if (nightvisionBtn) nightvisionBtn.addEventListener('click', () => {
+    isNightVisionOn = !isNightVisionOn;
+    nightvisionBtn.style.background = isNightVisionOn ? 'rgba(34,197,94,.8)' : 'rgba(126,34,206,.8)';
+  });
+
+  if (breakBtn) {
+    breakBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isBreakBtnHeld = true; }, { passive: false });
+    breakBtn.addEventListener('touchend', () => { isBreakBtnHeld = false; });
+    breakBtn.addEventListener('touchcancel', () => { isBreakBtnHeld = false; });
+  }
+
+  if (placeBtn) {
+    placeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); handlePlaceAction(); }, { passive: false });
+    placeBtn.addEventListener('click', handlePlaceAction);
+  }
+
+  if (flyBtn) {
+    flyBtn.addEventListener('click', () => {
+      isFlying = !isFlying;
+      flyBtn.style.background = isFlying ? 'rgba(34,197,94,.8)' : 'rgba(168,85,247,.6)';
+      if (flyUp) flyUp.style.display = isFlying ? 'flex' : 'none';
+      if (flyDown) flyDown.style.display = isFlying ? 'flex' : 'none';
+    });
+  }
+  if (flyUp) { flyUp.addEventListener('touchstart', (e) => { e.preventDefault(); flyVerticalState = 1; }, { passive: false }); flyUp.addEventListener('touchend', () => { flyVerticalState = 0; }); flyUp.addEventListener('mousedown', () => { flyVerticalState = 1; }); flyUp.addEventListener('mouseup', () => { flyVerticalState = 0; }); }
+  if (flyDown) { flyDown.addEventListener('touchstart', (e) => { e.preventDefault(); flyVerticalState = -1; }, { passive: false }); flyDown.addEventListener('touchend', () => { flyVerticalState = 0; }); flyDown.addEventListener('mousedown', () => { flyVerticalState = -1; }); flyDown.addEventListener('mouseup', () => { flyVerticalState = 0; }); }
+
+  if (mobileJumpBtn) {
+    mobileJumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (player) player.jump(); }, { passive: false });
+    mobileJumpBtn.addEventListener('click', () => { if (player) player.jump(); });
+  }
+
+  // joystick safe handlers
+  if (joystickZone && joystickKnob) {
+    joystickZone.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const t = e.targetTouches[0];
+      joystickPointerId = t.identifier;
+      const rect = joystickZone.getBoundingClientRect();
+      joystickOrigin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      updateJoystick(t.clientX, t.clientY, joystickKnob);
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickPointerId) {
+          updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY, joystickKnob);
+          break;
+        }
+      }
+    }, { passive: false });
+
+    const resetJoy = (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickPointerId) {
+          joystickPointerId = null;
+          joystickMove = { x: 0, y: 0 };
+          joystickKnob.style.transform = `translate(0px, 0px)`;
+          break;
+        }
+      }
+    };
+    joystickZone.addEventListener('touchend', resetJoy);
+    joystickZone.addEventListener('touchcancel', resetJoy);
+  }
+
+  // touch look-zone
+  if (lookZone) {
+    lookZone.addEventListener('touchstart', (e) => {
+      const t = e.targetTouches[0];
+      lookPointerId = t.identifier;
+      lastLookPos = { x: t.clientX, y: t.clientY };
+    });
+    lookZone.addEventListener('touchmove', (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === lookPointerId) {
+          const dx = t.clientX - lastLookPos.x;
+          const dy = t.clientY - lastLookPos.y;
+          yaw -= dx * 0.005;
+          pitch -= dy * 0.005;
+          pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+          lastLookPos = { x: t.clientX, y: t.clientY };
+          break;
+        }
+      }
+    });
+    const resetLook = (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === lookPointerId) {
+          lookPointerId = null;
+          break;
+        }
+      }
+    };
+    lookZone.addEventListener('touchend', resetLook);
+    lookZone.addEventListener('touchcancel', resetLook);
+  }
+
+  // 其余全局键盘与鼠标绑定（桌面）
+  window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (e.code === 'KeyE') {
+      if (isCraftingTableOpen) toggleCraftingTable();
+      else toggleInventory();
+    }
+    if (e.code === 'Space' && player) player.jump();
+    if (/^Digit[1-9]$/.test(e.code)) {
+      const slot = Number(e.code.slice(-1)) - 1;
+      if (slot >= 0 && slot < hotbarSlots.length) { selectedBlockId = hotbarSlots[slot]; renderHotbar(); }
+    }
+    if (e.code === 'KeyV') toggleThirdPerson();
+    if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight')) isSprinting = true;
+    if ((e.code === 'ControlLeft' || e.code === 'ControlRight')) isCrouching = true;
+    if (e.code === 'KeyF') consumeSelectedFood();
+  });
+  window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isSprinting = false;
+    if (e.code === 'ControlLeft' || e.code === 'ControlRight') isCrouching = false;
+  });
+
+  // 鼠标移动 - 仅桌面可用
+  if (!isMobile) {
+    window.addEventListener('mousemove', (e) => {
+      if (document.pointerLockElement === document.body) {
+        yaw -= e.movementX * 0.003;
+        pitch -= e.movementY * 0.003;
+        pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+      }
+    });
+    window.addEventListener('mousedown', (e) => {
+      if (isInGame && !isInventoryOpen && !isCraftingTableOpen) {
+        if (document.pointerLockElement !== document.body) { document.body.requestPointerLock?.(); }
+        else {
+          if (e.button === 0) isLeftMouseDown = true;
+          if (e.button === 2) handlePlaceAction();
+        }
+      }
+    });
+    window.addEventListener('mouseup', (e) => { if (e.button === 0) isLeftMouseDown = false; });
+  }
+}
+
+/* ========= UI 显示控制 ========= */
 function startGame(mode) {
   gameMode = mode; isInGame = true;
-  document.getElementById('main-menu').classList.add('hidden');
-  document.getElementById('in-game-ui').classList.remove('hidden');
+  const mainMenu = document.getElementById('main-menu'); if (mainMenu) mainMenu.style.display = 'none';
+  const inGameUI = document.getElementById('in-game-ui'); if (inGameUI) inGameUI.style.display = 'block';
   document.getElementById('crosshair').style.display = isThirdPerson ? 'none' : 'block';
   if (playerMesh) playerMesh.visible = isThirdPerson;
-  document.getElementById('status-container').style.display = mode === 'survival' ? 'flex' : 'none';
-  document.getElementById('fly-btn').style.display = mode === 'creative' ? 'flex' : 'none';
+  const statusContainer = document.getElementById('status-container'); if (statusContainer) statusContainer.style.display = mode === 'survival' ? 'flex' : 'none';
+  const flyBtnEl = document.getElementById('fly-btn'); if (flyBtnEl) flyBtnEl.style.display = mode === 'creative' ? 'flex' : 'none';
   renderHotbar(); renderInventoryUI();
 }
-function respawnPlayer() { document.getElementById('death-screen').style.display = 'none'; player.position.set(0, isMobile ? 92 : 95, 0); player.velocity.set(0,0,0); hp = MAX_HP; hunger = MAX_HUNGER; isInGame = true; document.getElementById('crosshair').style.display = isThirdPerson ? 'none' : 'block'; if (playerMesh) playerMesh.visible = isThirdPerson; updateHealthUI(); updateHungerUI(); }
-function showMainMenu() { isInGame = false; document.getElementById('main-menu').classList.remove('hidden'); document.getElementById('in-game-ui').classList.add('hidden'); document.getElementById('crosshair').style.display = 'none'; if (playerMesh) playerMesh.visible = false; }
+function respawnPlayer() {
+  const death = document.getElementById('death-screen'); if (death) death.style.display = 'none';
+  player.position.set(0, isMobile ? 92 : 95, 0); player.velocity.set(0,0,0);
+  hp = MAX_HP; hunger = MAX_HUNGER; isInGame = true;
+  document.getElementById('crosshair').style.display = isThirdPerson ? 'none' : 'block';
+  if (playerMesh) playerMesh.visible = isThirdPerson;
+  updateHealthUI(); updateHungerUI();
+}
+function showMainMenu() {
+  isInGame = false;
+  const mainMenu = document.getElementById('main-menu'); if (mainMenu) mainMenu.style.display = 'flex';
+  const inGameUI = document.getElementById('in-game-ui'); if (inGameUI) inGameUI.style.display = 'none';
+  document.getElementById('crosshair').style.display = 'none';
+  if (playerMesh) playerMesh.visible = false;
+}
 function toggleInventory() {
   if (isCraftingTableOpen) return;
   isInventoryOpen = !isInventoryOpen; heldItem = null;
-  const modal = document.getElementById('inventory-modal');
-  modal.style.display = isInventoryOpen ? 'flex' : 'none';
+  const modal = document.getElementById('inventory-modal'); if (modal) modal.style.display = isInventoryOpen ? 'flex' : 'none';
   if (isInventoryOpen) { if (document.pointerLockElement) document.exitPointerLock?.(); renderInventoryUI(); resetMiningProcess(); }
 }
 function toggleCraftingTable() {
   if (isInventoryOpen) return;
   isCraftingTableOpen = !isCraftingTableOpen;
-  const modal = document.getElementById('crafting-table-modal');
-  modal.style.display = isCraftingTableOpen ? 'flex' : 'none';
+  const modal = document.getElementById('crafting-table-modal'); if (modal) modal.style.display = isCraftingTableOpen ? 'flex' : 'none';
   if (isCraftingTableOpen) { if (document.pointerLockElement) document.exitPointerLock?.(); renderCraftingTableUI(); resetMiningProcess(); }
 }
-function toggleThirdPerson() { isThirdPerson = !isThirdPerson; document.getElementById('crosshair').style.display = isThirdPerson ? 'none' : 'block'; if (playerMesh) playerMesh.visible = isThirdPerson; }
+function toggleThirdPerson() { isThirdPerson = !isThirdPerson; const cross = document.getElementById('crosshair'); if (cross) cross.style.display = isThirdPerson ? 'none' : 'block'; if (playerMesh) playerMesh.visible = isThirdPerson; }
 
-/* ========= 渲染与启动 ========= */
-initEngine();
-setupUIEvents();
-renderHotbar();
-renderInventoryUI();
-animate();
+/* ========= 辅助：renderCraftingTableUI（保留） ========= */
+function renderCraftingTableUI() {
+  const recipesList = document.getElementById('advanced-recipes-list'); if (!recipesList) return;
+  recipesList.innerHTML = '';
+  const advancedRecipes = [
+    { name: '🪵 木棍 x4', cost: {5: 2}, give: {27: 4} },
+    { name: '⚔️ 木剑', cost: {5: 2, 27: 1}, give: {28: 1} },
+    { name: '⚔️ 石剑', cost: {3: 2, 27: 1}, give: {29: 1} },
+    { name: '⛏️ 铁镐', cost: {36: 3, 27: 2}, give: {40: 1} },
+    { name: '⛏️ 钻石镐', cost: {38: 3, 27: 2}, give: {41: 1} }
+  ];
+  advancedRecipes.forEach(r => {
+    const row = document.createElement('div'); row.className = 'recipe-row'; row.innerHTML = `<span>${r.name}</span>`;
+    let canCraft = true;
+    if (gameMode !== 'creative') {
+      for (let id in r.cost) { if ((inventory[id] || 0) < r.cost[id]) { canCraft = false; break; } }
+    }
+    const btn = document.createElement('button'); btn.className = 'recipe-btn'; btn.innerText = '制作/烧制'; btn.disabled = !canCraft && gameMode !== 'creative';
+    btn.addEventListener('click', () => {
+      if (gameMode === 'creative' || canCraft) {
+        if (gameMode !== 'creative') {
+          for (let id in r.cost) inventory[id] -= r.cost[id];
+        }
+        for (let id in r.give) inventory[id] = (inventory[id] || 0) + r.give[id];
+        renderCraftingTableUI(); renderHotbar();
+      }
+    });
+    row.appendChild(btn); recipesList.appendChild(row);
+  });
+}
 
-// 尝试自动加载存档（若存在）
-loadGame();
+/* ========= DOMContentLoaded 启动（修正：在 DOM 就绪时初始化并设置初始 UI 显示） ========= */
+document.addEventListener('DOMContentLoaded', () => {
+  // 强制初始 UI 状态，避免不同 HTML/CSS 版本导致 modal 显示错误
+  const mainMenu = document.getElementById('main-menu');
+  const inventoryModal = document.getElementById('inventory-modal');
+  const craftingModal = document.getElementById('crafting-table-modal');
+  const inGameUI = document.getElementById('in-game-ui');
+  const deathScreen = document.getElementById('death-screen');
+  const crosshair = document.getElementById('crosshair');
 
-// 暴露一些调试接口
-window.world = world; window.player = player; window.saveGame = saveGame; window.loadGame = loadGame;
-window.openFurnace = openFurnace; window.closeFurnace = closeFurnace;
+  if (mainMenu) mainMenu.style.display = 'flex';
+  if (inventoryModal) inventoryModal.style.display = 'none';
+  if (craftingModal) craftingModal.style.display = 'none';
+  if (inGameUI) inGameUI.style.display = 'none';
+  if (deathScreen) deathScreen.style.display = 'none';
+  if (crosshair) crosshair.style.display = 'none';
+
+  // 初始化引擎与事件（确保 DOM 已就绪）
+  initEngine();
+  setupUIEvents();
+  renderHotbar();
+  renderInventoryUI();
+
+  // 尝试恢复存档（不自动进入游戏）
+  loadGame();
+
+  // 启动主循环
+  animate();
+});
+
+/* ========= 暴露调试接口 ========= */
+window.world = () => world;
+window.playerRef = () => player;
+window.saveGameDebug = saveGame;
+window.loadGameDebug = loadGame;
