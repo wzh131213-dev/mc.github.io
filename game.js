@@ -1,4 +1,4 @@
-/* game.js - 已修正：
+/* game.js：
    - safe UI event binding（绑定前检测元素存在）
    - 初始化延后到 DOMContentLoaded，启动时强制设置 UI 初始可见状态
    移动优先版本基础上仅调整初始化、事件绑定，保留原功能与结构（区块/矿物/背包/熔炉/挖掘等）。
