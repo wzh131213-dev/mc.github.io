@@ -1022,7 +1022,13 @@ function setupUIEvents() {
   }
 
   if (flyBtn) {
-    flyBtn.addEventListener('click', ()=>{ isFlying = !isFlying; flyBtn.style.background = isFlying ? 'rgba(34,197,94,.8)' : 'rgba(168,85,247,.6)'; if (flyUp) flyUp.style.display = isFlying ? 'flex' : 'none'; if (flyDown) flyDown.style.display = isFlying ? 'flex' : 'none'; });
+    flyBtn.addEventListener('click', ()=>{
+      if (gameMode !== 'creative') return;
+      isFlying = !isFlying;
+      flyBtn.style.background = isFlying ? 'rgba(34,197,94,.8)' : 'rgba(168,85,247,.6)';
+      if (flyUp) flyUp.style.display = isFlying ? 'flex' : 'none';
+      if (flyDown) flyDown.style.display = isFlying ? 'flex' : 'none';
+    });
   }
 
   if (flyUp) { flyUp.addEventListener('touchstart', (e)=>{ e.preventDefault(); flyVerticalState = 1; }, { passive:false }); flyUp.addEventListener('touchend', ()=>{ flyVerticalState = 0; }); flyUp.addEventListener('mousedown', ()=>{ flyVerticalState = 1; }); flyUp.addEventListener('mouseup', ()=>{ flyVerticalState = 0; }); }
