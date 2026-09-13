@@ -989,7 +989,6 @@ function setupUIEvents() {
   const craftingCloseBtn = document.getElementById('crafting-table-close-btn');
   const viewToggleBtn = document.getElementById('view-toggle-btn');
   const nightvisionBtn = document.getElementById('nightvision-btn');
-  const timeBtn = document.getElementById('time-btn');
   const breakBtn = document.getElementById('break-btn');
   const placeBtn = document.getElementById('place-btn');
   const flyBtn = document.getElementById('fly-btn');
@@ -1010,12 +1009,6 @@ function setupUIEvents() {
 
   if (viewToggleBtn) viewToggleBtn.addEventListener('click', (e)=>{ e.stopPropagation(); toggleThirdPerson(); });
   if (nightvisionBtn) nightvisionBtn.addEventListener('click', ()=>{ isNightVisionOn = !isNightVisionOn; nightvisionBtn.style.background = isNightVisionOn ? 'rgba(34,197,94,.8)' : 'rgba(126,34,206,.8)'; });
-  if (timeBtn) timeBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (gameMode !== 'creative') return;
-    dayTime = (dayTime + 0.125) % 1;
-    updateDayNightCycle(0);
-  });
 
   if (breakBtn) {
     breakBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); isBreakBtnHeld = true; }, { passive: false });
@@ -1081,7 +1074,13 @@ function startGame(mode) {
   const cross = document.getElementById('crosshair'); if (cross) cross.style.display = isThirdPerson ? 'none' : 'block';
   if (playerMesh) playerMesh.visible = isThirdPerson;
   const statusContainer = document.getElementById('status-container'); if (statusContainer) statusContainer.style.display = mode === 'survival' ? 'flex' : 'none';
-  const flyBtnEl = document.getElementById('fly-btn'); if (flyBtnEl) flyBtnEl.style.display = mode === 'creative' ? 'flex' : 'none';
+  const flyBtnEl = document.getElementById('fly-btn');
+  const flyUpEl = document.getElementById('fly-up-btn');
+  const flyDownEl = document.getElementById('fly-down-btn');
+  if (mode !== 'creative') isFlying = false;
+  if (flyBtnEl) flyBtnEl.style.display = mode === 'creative' ? 'flex' : 'none';
+  if (flyUpEl) flyUpEl.style.display = 'none';
+  if (flyDownEl) flyDownEl.style.display = 'none';
   renderHotbar(); renderInventoryUI();
 }
 function respawnPlayer() {
@@ -1244,7 +1243,17 @@ window.gameDebug = {
     authOk.addEventListener('click', () => { if (authInput.value === PASSWORD) { setAuthed(true); hideAuthModal(); panel.style.display = 'block'; } else { authInput.style.borderColor = '#b91c1c'; setTimeout(() => { authInput.style.borderColor = ''; }, 900); authInput.focus(); } });
     authInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') authOk.click(); });
     closeEl.addEventListener('click', () => { panel.style.display = 'none'; });
-    btnToggleMode.addEventListener('click', () => { const newMode = gameMode === 'creative' ? 'survival' : 'creative'; window.gameDebug.setMode(newMode); const flyBtn = document.getElementById('fly-btn'); if (flyBtn) flyBtn.style.display = newMode === 'creative' ? 'flex' : 'none'; });
+    btnToggleMode.addEventListener('click', () => {
+      const newMode = gameMode === 'creative' ? 'survival' : 'creative';
+      window.gameDebug.setMode(newMode);
+      const flyBtn = document.getElementById('fly-btn');
+      const flyUpBtn = document.getElementById('fly-up-btn');
+      const flyDownBtn = document.getElementById('fly-down-btn');
+      if (newMode !== 'creative') isFlying = false;
+      if (flyBtn) flyBtn.style.display = newMode === 'creative' ? 'flex' : 'none';
+      if (flyUpBtn) flyUpBtn.style.display = 'none';
+      if (flyDownBtn) flyDownBtn.style.display = 'none';
+    });
     btnSpawnMob.addEventListener('click', () => { if (!player || !scene) return; const mob = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.8, 0.8), new THREE.MeshLambertMaterial({ color: 0x15803d })); mob.position.set(player.position.x + 2, player.position.y + 1, player.position.z + 2); mob.userData = { hp: 3, lastAttack: 0 }; scene.add(mob); mobs.push(mob); });
     btnGive.addEventListener('click', () => { const id = Number(giveId.value) || 0; const amount = Math.max(1, Number(giveAmt.value) || 1); if (!id) return alert('请输入有效物品ID'); inventory[id] = (inventory[id] || 0) + amount; renderHotbar(); renderInventoryUI(); });
     btnTp.addEventListener('click', () => { const x = Number(tpX.value), y = Number(tpY.value), z = Number(tpZ.value); if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) && player) { player.position.set(x, y, z); coordsEl.innerText = `${Math.floor(x)}, ${Math.floor(y)}, ${Math.floor(z)}`; } else alert('请输入有效坐标并确保玩家已初始化'); });
