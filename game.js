@@ -826,6 +826,16 @@ function updateWorldChunks() {
   }
 }
 
+function findMobGroundY(x, z) {
+  const blockX = Math.floor(x);
+  const blockZ = Math.floor(z);
+  for (let y = CHUNK_SIZE_Y - 1; y >= 0; y--) {
+    const voxel = world.getVoxel(blockX, y, blockZ);
+    if (voxel !== 0 && voxel !== 4 && voxel !== 6) return y + 1;
+  }
+  return 1;
+}
+
 /* ---------- 日夜 / 怪物 / 饥饿 ---------- */
 let dayTime = 0, survivalDays = 1;
 const DAY_DURATION = 120.0;
@@ -860,9 +870,9 @@ function updateDayNightCycle(delta) {
       if (mobs.length < 15) {
         const angle = Math.random() * Math.PI * 2; const dist = 14 + Math.random() * 10;
         const sx = player.position.x + Math.cos(angle) * dist; const sz = player.position.z + Math.sin(angle) * dist;
-        const sy = Math.max(1, Math.floor(world.getVoxel(Math.floor(sx), 100, Math.floor(sz)) ? 100 : 80));
+        const sy = findMobGroundY(sx, sz);
         const mob = new THREE.Mesh(new THREE.BoxGeometry(0.8,1.8,0.8), new THREE.MeshLambertMaterial({ color: 0x15803d }));
-        mob.position.set(sx, sy + 2, sz); mob.userData = { hp:3, lastAttack:0 };
+        mob.position.set(sx, sy + 0.9, sz); mob.userData = { hp:3, lastAttack:0 };
         scene.add(mob); mobs.push(mob);
       }
     }
@@ -979,6 +989,7 @@ function setupUIEvents() {
   const craftingCloseBtn = document.getElementById('crafting-table-close-btn');
   const viewToggleBtn = document.getElementById('view-toggle-btn');
   const nightvisionBtn = document.getElementById('nightvision-btn');
+  const timeBtn = document.getElementById('time-btn');
   const breakBtn = document.getElementById('break-btn');
   const placeBtn = document.getElementById('place-btn');
   const flyBtn = document.getElementById('fly-btn');
@@ -999,6 +1010,12 @@ function setupUIEvents() {
 
   if (viewToggleBtn) viewToggleBtn.addEventListener('click', (e)=>{ e.stopPropagation(); toggleThirdPerson(); });
   if (nightvisionBtn) nightvisionBtn.addEventListener('click', ()=>{ isNightVisionOn = !isNightVisionOn; nightvisionBtn.style.background = isNightVisionOn ? 'rgba(34,197,94,.8)' : 'rgba(126,34,206,.8)'; });
+  if (timeBtn) timeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (gameMode !== 'creative') return;
+    dayTime = (dayTime + 0.125) % 1;
+    updateDayNightCycle(0);
+  });
 
   if (breakBtn) {
     breakBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); isBreakBtnHeld = true; }, { passive: false });
