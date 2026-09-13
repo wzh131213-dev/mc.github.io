@@ -765,6 +765,7 @@ let yaw = 0, pitch = 0;
 const keys = {};
 let joystickPointerId = null, joystickOrigin = { x:0, y:0 }, joystickMove = { x:0, y:0 };
 let lookPointerId = null, lastLookPos = { x:0, y:0 };
+let pendingLookX = 0, pendingLookY = 0;
 
 function updateJoystick(clientX, clientY, knobEl) {
   let dx = clientX - joystickOrigin.x, dy = clientY - joystickOrigin.y;
@@ -844,7 +845,11 @@ function updateDayNightCycle(delta) {
   else if (sunHeight > -0.2) { dirLight.intensity = 0.4; ambientLight.intensity = 0.3; periodText = sunHeight > 0 ? '黄昏' : '傍晚'; }
   else { scene.background.copy(nightColor); scene.fog.color.copy(nightColor); dirLight.intensity = 0.15; ambientLight.intensity = 0.15; periodText = '夜晚'; }
   if (isNightVisionOn) { scene.background.copy(dayColor); scene.fog.color.copy(dayColor); dirLight.intensity = 1.2; ambientLight.intensity = 1.0; }
-  const periodEl = document.getElementById('time-period-val'); if (periodEl) periodEl.innerText = periodText;
+  if (periodText !== updateDayNightCycle.lastPeriod) {
+    const periodEl = document.getElementById('time-period-val');
+    if (periodEl) periodEl.innerText = periodText;
+    updateDayNightCycle.lastPeriod = periodText;
+  }
 
   if (gameMode === 'survival') {
     const isNight = sunHeight < -0.2;
@@ -895,6 +900,14 @@ function animate() {
   const now = performance.now();
   const delta = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
+
+  if (pendingLookX !== 0 || pendingLookY !== 0) {
+    yaw -= pendingLookX * 0.005;
+    pitch -= pendingLookY * 0.005;
+    pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+    pendingLookX = 0;
+    pendingLookY = 0;
+  }
 
   frameCount++; fpsTime += delta;
   if (fpsTime >= 1.0) {
@@ -1019,7 +1032,7 @@ function setupUIEvents() {
 
   if (lookZone) {
     lookZone.addEventListener('touchstart', (e)=>{ e.preventDefault(); const t = e.targetTouches[0]; lookPointerId = t.identifier; lastLookPos = { x: t.clientX, y: t.clientY }; }, { passive:false });
-    lookZone.addEventListener('touchmove', (e)=>{ e.preventDefault(); for (let i=0;i<e.changedTouches.length;i++){ const t = e.changedTouches[i]; if (t.identifier === lookPointerId) { const dx = t.clientX - lastLookPos.x; const dy = t.clientY - lastLookPos.y; yaw -= dx * 0.005; pitch -= dy * 0.005; pitch = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, pitch)); lastLookPos = { x: t.clientX, y: t.clientY }; break; } } }, { passive:false });
+    lookZone.addEventListener('touchmove', (e)=>{ e.preventDefault(); for (let i=0;i<e.changedTouches.length;i++){ const t = e.changedTouches[i]; if (t.identifier === lookPointerId) { pendingLookX += t.clientX - lastLookPos.x; pendingLookY += t.clientY - lastLookPos.y; lastLookPos = { x: t.clientX, y: t.clientY }; break; } } }, { passive:false });
     const resetLook = (e)=>{ for (let i=0;i<e.changedTouches.length;i++) if (e.changedTouches[i].identifier === lookPointerId) { lookPointerId = null; break; } };
     lookZone.addEventListener('touchend', resetLook); lookZone.addEventListener('touchcancel', resetLook);
   }
