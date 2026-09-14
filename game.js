@@ -349,6 +349,15 @@ class PlayerEntity {
 
 /* ---------- UI / Hotbar / Inventory / Crafting (updated) ---------- */
 
+function useHotbarSlot(slotIndex) {
+  const id = hotbarSlots[slotIndex];
+  if (!id) return;
+  selectedBlockId = id;
+  const def = BLOCK_DEFS[id];
+  if (def && def.food) consumeSelectedFood();
+  else renderHotbar();
+}
+
 // Render hotbar (updated: supports empty slots and pick-up / place interactions)
 function renderHotbar() {
   const hotbar = document.getElementById('hotbar'); if (!hotbar) return;
@@ -372,6 +381,10 @@ function renderHotbar() {
 
     // Click to pick up or place
     slot.addEventListener('click', () => {
+      if (!isInventoryOpen && isInGame) {
+        useHotbarSlot(slotIndex);
+        return;
+      }
       if (!heldItem) {
         if (hotbarSlots[slotIndex]) {
           // pick up from hotbar
@@ -961,7 +974,7 @@ function showFoodEffect(foodName, amount) {
   requestAnimationFrame(() => effect.classList.add('show'));
   setTimeout(() => effect.remove(), 900);
 }
-function consumeSelectedFood() { if (!isInGame || gameMode !== 'survival') return; const def = BLOCK_DEFS[selectedBlockId]; if (!def || !def.food || (inventory[selectedBlockId]||0) <= 0) return; if (hunger >= MAX_HUNGER) return; hunger = Math.min(MAX_HUNGER, hunger + def.food * 10); hp = Math.min(MAX_HP, hp + 2); inventory[selectedBlockId]--; starvationTimer=0; hungerTimer=0; updateHungerUI(); updateHealthUI(); showFoodEffect(def.name, def.food * 10); renderHotbar(); renderInventoryUI(); }
+function consumeSelectedFood() { if (!isInGame || gameMode !== 'survival') return; const def = BLOCK_DEFS[selectedBlockId]; if (!def || !def.food || (inventory[selectedBlockId]||0) <= 0) return; hunger = Math.min(MAX_HUNGER, hunger + def.food * 10); hp = Math.min(MAX_HP, hp + 2); inventory[selectedBlockId]--; starvationTimer=0; hungerTimer=0; updateHungerUI(); updateHealthUI(); showFoodEffect(def.name, def.food * 10); renderHotbar(); renderInventoryUI(); }
 
 /* ---------- 动画循环 ---------- */
 let lastTime = performance.now(), frameCount = 0, fpsTime = 0;
