@@ -379,8 +379,11 @@ function renderHotbar() {
       slot.appendChild(emptyLabel);
     }
 
-    // Click to pick up or place
-    slot.addEventListener('click', () => {
+    const handleHotbarInteraction = (event) => {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       if (!isInventoryOpen && isInGame) {
         useHotbarSlot(slotIndex);
         return;
@@ -405,6 +408,21 @@ function renderHotbar() {
       }
       renderHotbar();
       renderInventoryUI();
+    };
+
+    // Use pointerdown so touch devices do not lose food activation to hotbar scrolling.
+    slot.addEventListener('pointerdown', (event) => {
+      if (!isInventoryOpen && isInGame) {
+        slot.dataset.pointerHandled = '1';
+        handleHotbarInteraction(event);
+      }
+    });
+    slot.addEventListener('click', (event) => {
+      if (slot.dataset.pointerHandled === '1') {
+        delete slot.dataset.pointerHandled;
+        return;
+      }
+      handleHotbarInteraction(event);
     });
 
     // allow drag drop from inventory
