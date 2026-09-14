@@ -29,6 +29,8 @@ html,body { width:100%;height:100%;overflow:hidden;position:fixed;background:#87
 .heart-unit { font-size:16px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8)); }
 #hunger-bar-bg { width:140px; height:10px; background:rgba(255,255,255,0.12); border-radius:6px; overflow:hidden; border:1px solid rgba(0,0,0,0.4); }
 #hunger-bar-fill { width:100%; height:100%; background:#d97706; transition:width .25s ease; }
+.food-effect { position:fixed; left:50%; top:43%; z-index:80; color:#fde68a; font-size:18px; font-weight:800; text-shadow:0 2px 3px #000; opacity:0; transform:translate(-50%, 12px); transition:opacity .18s ease, transform .7s ease; pointer-events:none; }
+.food-effect.show { opacity:1; transform:translate(-50%, -18px); }
 
 /* inventory and crafting */
 .inv-container { background:rgba(30,41,59,0.98); border:2px solid rgba(255,255,255,0.12); border-radius:12px; padding:14px; width:100%; max-width:980px; box-shadow:0 12px 30px rgba(0,0,0,0.6); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; gap:12px; }

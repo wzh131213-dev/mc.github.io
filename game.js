@@ -68,6 +68,7 @@ let selectedBlockId = 1;
 let hotbarSlots = [1,2,3,4,5,6,13,14,20];
 let inventory = {1:10,2:10,3:10,4:10,5:10,6:10,13:1,14:1,20:5,22:5};
 let heldItem = null; // {id, from: 'backpack'|'hotbar', index}
+let droppedItems = [];
 let mobs = []; let lastSpawnTime = 0;
 
 /* ---------- 面 / DDA ---------- */
@@ -571,6 +572,60 @@ function handleSlotDrop(draggedId, targetSlotIndex) {
   renderInventoryUI();
 }
 
+function throwHeldItem() {
+  if (!heldItem || !player || !world) return;
+  const thrownId = heldItem.id;
+  const direction = new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)).normalize();
+  const position = player.position.clone();
+  position.y += player.eyeHeight;
+  position.addScaledVector(direction, 0.8);
+
+  if (heldItem.from === 'backpack' && gameMode !== 'creative') {
+    inventory[thrownId] = Math.max(0, (inventory[thrownId] || 0) - 1);
+    if (inventory[thrownId] === 0) delete inventory[thrownId];
+  }
+
+  const def = BLOCK_DEFS[thrownId];
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.32, 0.32, 0.32),
+    new THREE.MeshLambertMaterial({ color: new THREE.Color(`rgb(${def.color.join(',')})`) })
+  );
+  mesh.position.copy(position);
+  mesh.userData = { id: thrownId, velocity: direction.multiplyScalar(8).add(new THREE.Vector3(0, 2.2, 0)), age: 0 };
+  scene.add(mesh);
+  droppedItems.push(mesh);
+  heldItem = null;
+  renderHotbar();
+  renderInventoryUI();
+}
+
+function updateDroppedItems(delta) {
+  for (let i = droppedItems.length - 1; i >= 0; i--) {
+    const item = droppedItems[i];
+    const data = item.userData;
+    data.age += delta;
+    data.velocity.y -= 18 * delta;
+    item.position.addScaledVector(data.velocity, delta);
+    item.rotation.x += delta * 5;
+    item.rotation.y += delta * 7;
+
+    const floorY = Math.floor(item.position.y);
+    if (data.velocity.y < 0 && world.getVoxel(Math.floor(item.position.x), floorY, Math.floor(item.position.z)) !== 0) {
+      item.position.y = floorY + 1.08;
+      data.velocity.y = Math.abs(data.velocity.y) * 0.25;
+      data.velocity.x *= 0.82;
+      data.velocity.z *= 0.82;
+    }
+
+    if (data.age > 12) {
+      scene.remove(item);
+      item.geometry.dispose();
+      item.material.dispose();
+      droppedItems.splice(i, 1);
+    }
+  }
+}
+
 /* ---------- Furnace (kept) ---------- */
 let furnaceState = { open:false, input:0, inputCount:0, fuel:0, fuelCount:0, output:0, outputCount:0, progress:0, burn:0, maxBurn:0 };
 function smeltRecipe3(id) {
@@ -898,7 +953,15 @@ function updateHungerAndHealth(delta) {
 function takeDamage(amt) { if (gameMode !== 'survival' || hp <= 0) return; hp = Math.max(0, hp - amt); updateHealthUI(); if (hp <= 0) { isInGame = false; const ds = document.getElementById('death-screen'); if (ds) ds.style.display = 'flex'; const ch = document.getElementById('crosshair'); if (ch) ch.style.display = 'none'; resetMiningProcess(); } }
 function updateHealthUI() { const bar = document.getElementById('health-bar'); if (!bar) return; bar.innerHTML = ''; const hearts = Math.ceil(hp/2); for (let i=0;i<MAX_HP/2;i++){ const h = document.createElement('span'); h.className='heart-unit'; h.innerText = i<hearts ? '❤️' : '🖤'; bar.appendChild(h); } }
 function updateHungerUI() { const fill = document.getElementById('hunger-bar-fill'); const text = document.getElementById('hunger-val-text'); const pct = (hunger / MAX_HUNGER) * 100; if (fill) fill.style.width = pct + '%'; if (text) text.innerText = `${hunger}/${MAX_HUNGER}`; }
-function consumeSelectedFood() { if (!isInGame || gameMode !== 'survival') return; const def = BLOCK_DEFS[selectedBlockId]; if (!def || !def.food || (inventory[selectedBlockId]||0) <= 0) return; if (hunger >= MAX_HUNGER) return; hunger = Math.min(MAX_HUNGER, hunger + def.food * 10); hp = Math.min(MAX_HP, hp + 2); inventory[selectedBlockId]--; starvationTimer=0; hungerTimer=0; updateHungerUI(); updateHealthUI(); renderHotbar(); renderInventoryUI(); }
+function showFoodEffect(foodName, amount) {
+  const effect = document.createElement('div');
+  effect.className = 'food-effect';
+  effect.innerText = `${foodName} +${amount} 饥饿`;
+  document.body.appendChild(effect);
+  requestAnimationFrame(() => effect.classList.add('show'));
+  setTimeout(() => effect.remove(), 900);
+}
+function consumeSelectedFood() { if (!isInGame || gameMode !== 'survival') return; const def = BLOCK_DEFS[selectedBlockId]; if (!def || !def.food || (inventory[selectedBlockId]||0) <= 0) return; if (hunger >= MAX_HUNGER) return; hunger = Math.min(MAX_HUNGER, hunger + def.food * 10); hp = Math.min(MAX_HP, hp + 2); inventory[selectedBlockId]--; starvationTimer=0; hungerTimer=0; updateHungerUI(); updateHealthUI(); showFoodEffect(def.name, def.food * 10); renderHotbar(); renderInventoryUI(); }
 
 /* ---------- 动画循环 ---------- */
 let lastTime = performance.now(), frameCount = 0, fpsTime = 0;
@@ -957,6 +1020,7 @@ function animate() {
     const coordsEl = document.getElementById('coords-val'); if (coordsEl) coordsEl.innerText = `${Math.floor(player.position.x)}, ${Math.floor(player.position.y)}, ${Math.floor(player.position.z)}`;
 
     updateWorldChunks();
+    updateDroppedItems(delta);
     updateDayNightCycle(delta);
     updateHungerAndHealth(delta);
     tickFurnace3(delta);
@@ -991,6 +1055,7 @@ function setupUIEvents() {
   const nightvisionBtn = document.getElementById('nightvision-btn');
   const breakBtn = document.getElementById('break-btn');
   const placeBtn = document.getElementById('place-btn');
+  const eatBtn = document.getElementById('eat-btn');
   const flyBtn = document.getElementById('fly-btn');
   const flyUp = document.getElementById('fly-up-btn');
   const flyDown = document.getElementById('fly-down-btn');
@@ -998,6 +1063,7 @@ function setupUIEvents() {
   const joystickZone = document.getElementById('joystick-zone');
   const joystickKnob = document.getElementById('joystick-knob');
   const lookZone = document.getElementById('touch-look-zone');
+  let placeTouchHandled = false;
 
   if (cardCreative) cardCreative.addEventListener('click', () => startGame('creative'));
   if (cardSurvival) cardSurvival.addEventListener('click', () => startGame('survival'));
@@ -1011,15 +1077,17 @@ function setupUIEvents() {
   if (nightvisionBtn) nightvisionBtn.addEventListener('click', ()=>{ isNightVisionOn = !isNightVisionOn; nightvisionBtn.style.background = isNightVisionOn ? 'rgba(34,197,94,.8)' : 'rgba(126,34,206,.8)'; });
 
   if (breakBtn) {
-    breakBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); isBreakBtnHeld = true; }, { passive: false });
+    breakBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); if (heldItem) throwHeldItem(); else isBreakBtnHeld = true; }, { passive: false });
     breakBtn.addEventListener('touchend', ()=>{ isBreakBtnHeld = false; });
     breakBtn.addEventListener('touchcancel', ()=>{ isBreakBtnHeld = false; });
   }
 
   if (placeBtn) {
-    placeBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); handleBlockPlace(); }, { passive: false });
-    placeBtn.addEventListener('click', handleBlockPlace);
+    placeBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); placeTouchHandled = true; if (heldItem) throwHeldItem(); else handleBlockPlace(); setTimeout(() => { placeTouchHandled = false; }, 400); }, { passive: false });
+    placeBtn.addEventListener('click', ()=>{ if (placeTouchHandled) return; if (heldItem) throwHeldItem(); else handleBlockPlace(); });
   }
+
+  if (eatBtn) eatBtn.addEventListener('click', consumeSelectedFood);
 
   if (flyBtn) {
     flyBtn.addEventListener('click', ()=>{
@@ -1047,9 +1115,11 @@ function setupUIEvents() {
   }
 
   if (lookZone) {
-    lookZone.addEventListener('touchstart', (e)=>{ e.preventDefault(); const t = e.targetTouches[0]; lookPointerId = t.identifier; lastLookPos = { x: t.clientX, y: t.clientY }; }, { passive:false });
-    lookZone.addEventListener('touchmove', (e)=>{ e.preventDefault(); for (let i=0;i<e.changedTouches.length;i++){ const t = e.changedTouches[i]; if (t.identifier === lookPointerId) { pendingLookX += t.clientX - lastLookPos.x; pendingLookY += t.clientY - lastLookPos.y; lastLookPos = { x: t.clientX, y: t.clientY }; break; } } }, { passive:false });
-    const resetLook = (e)=>{ for (let i=0;i<e.changedTouches.length;i++) if (e.changedTouches[i].identifier === lookPointerId) { lookPointerId = null; break; } };
+    let lookTouchMoved = false;
+    let lookTouchStart = { x: 0, y: 0 };
+    lookZone.addEventListener('touchstart', (e)=>{ e.preventDefault(); const t = e.targetTouches[0]; lookPointerId = t.identifier; lookTouchStart = { x: t.clientX, y: t.clientY }; lastLookPos = { x: t.clientX, y: t.clientY }; lookTouchMoved = false; }, { passive:false });
+    lookZone.addEventListener('touchmove', (e)=>{ e.preventDefault(); for (let i=0;i<e.changedTouches.length;i++){ const t = e.changedTouches[i]; if (t.identifier === lookPointerId) { const dx = t.clientX - lastLookPos.x; const dy = t.clientY - lastLookPos.y; if (Math.hypot(t.clientX - lookTouchStart.x, t.clientY - lookTouchStart.y) > 8) lookTouchMoved = true; pendingLookX += dx; pendingLookY += dy; lastLookPos = { x: t.clientX, y: t.clientY }; break; } } }, { passive:false });
+    const resetLook = (e)=>{ for (let i=0;i<e.changedTouches.length;i++) if (e.changedTouches[i].identifier === lookPointerId) { if (!lookTouchMoved && heldItem && isInGame && !isInventoryOpen && !isCraftingTableOpen) throwHeldItem(); lookPointerId = null; break; } };
     lookZone.addEventListener('touchend', resetLook); lookZone.addEventListener('touchcancel', resetLook);
   }
 
@@ -1067,7 +1137,7 @@ function setupUIEvents() {
 
   if (!isMobile) {
     window.addEventListener('mousemove', (e)=> { if (document.pointerLockElement === document.body) { yaw -= e.movementX * 0.003; pitch -= e.movementY * 0.003; pitch = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, pitch)); } });
-    window.addEventListener('mousedown', (e)=> { if (isInGame && !isInventoryOpen && !isCraftingTableOpen) { if (document.pointerLockElement !== document.body) document.body.requestPointerLock?.(); else { if (e.button === 0) isLeftMouseDown = true; if (e.button === 2) handleBlockPlace(); } } });
+    window.addEventListener('mousedown', (e)=> { if (isInGame && !isInventoryOpen && !isCraftingTableOpen) { if (e.button === 0 && heldItem) { throwHeldItem(); return; } if (document.pointerLockElement !== document.body) document.body.requestPointerLock?.(); else { if (e.button === 0) isLeftMouseDown = true; if (e.button === 2) handleBlockPlace(); } } });
     window.addEventListener('mouseup', (e)=> { if (e.button === 0) isLeftMouseDown = false; });
   }
 }
@@ -1083,10 +1153,12 @@ function startGame(mode) {
   const flyBtnEl = document.getElementById('fly-btn');
   const flyUpEl = document.getElementById('fly-up-btn');
   const flyDownEl = document.getElementById('fly-down-btn');
+  const eatBtnEl = document.getElementById('eat-btn');
   if (mode !== 'creative') isFlying = false;
   if (flyBtnEl) flyBtnEl.style.display = mode === 'creative' ? 'flex' : 'none';
   if (flyUpEl) flyUpEl.style.display = 'none';
   if (flyDownEl) flyDownEl.style.display = 'none';
+  if (eatBtnEl) eatBtnEl.style.display = mode === 'survival' ? 'flex' : 'none';
   renderHotbar(); renderInventoryUI();
 }
 function respawnPlayer() {
@@ -1106,7 +1178,7 @@ function showMainMenu() {
 }
 function toggleInventory() {
   if (isCraftingTableOpen) return;
-  isInventoryOpen = !isInventoryOpen; heldItem = null;
+  isInventoryOpen = !isInventoryOpen;
   const modal = document.getElementById('inventory-modal'); if (modal) modal.style.display = isInventoryOpen ? 'flex' : 'none';
   if (isInventoryOpen) { if (document.pointerLockElement) document.exitPointerLock?.(); renderInventoryUI(); resetMiningProcess(); }
 }
