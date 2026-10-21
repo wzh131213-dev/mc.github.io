@@ -869,8 +869,11 @@ function initEngine() {
   scene.fog = new THREE.FogExp2(0x87ceeb, 0.012);
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference: isMobile ? 'low-power' : 'high-performance' });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  const viewportW = Math.max(1, document.documentElement.clientWidth || window.innerWidth);
+  const viewportH = Math.max(1, document.documentElement.clientHeight || window.innerHeight);
   renderer.setPixelRatio(MAX_RENDER_PIXEL_RATIO);
+  renderer.setSize(viewportW, viewportH, false);
+  renderer.domElement.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;display:block;z-index:0;';
   document.body.appendChild(renderer.domElement);
 
   scene.add(ambientLight);
@@ -1088,7 +1091,13 @@ function animate() {
 /* ---------- 窗口处理 ---------- */
 function onWindowResize() {
   if (!camera || !renderer) return;
-  camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+  const w = Math.max(1, document.documentElement.clientWidth || document.body.clientWidth || window.innerWidth);
+  const h = Math.max(1, document.documentElement.clientHeight || document.body.clientHeight || window.innerHeight);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+  renderer.domElement.style.width = '100vw';
+  renderer.domElement.style.height = '100vh';
 }
 
 /* ---------- UI 事件绑定（安全） ---------- */
