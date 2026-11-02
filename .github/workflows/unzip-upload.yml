@@ -1,0 +1,102 @@
+name: Unzip uploaded project
+
+on:
+  push:
+    paths:
+      - "incoming/*.zip"
+  workflow_dispatch:
+    inputs:
+      zip_path:
+        description: "ZIP 文件在仓库中的路径"
+        required: true
+        default: "incoming/minecraft-touch-flat.zip"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: unzip-upload-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  unzip-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Validate and extract ZIP
+        env:
+          ZIP_PATH: ${{ github.event_name == 'workflow_dispatch' && inputs.zip_path || github.event.head_commit.message }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ZIP_PATH: ${{ inputs.zip_path }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            ARCHIVE="$INPUT_ZIP_PATH"
+          else
+            # 自动触发时，只接受本次提交中 incoming/ 下的 ZIP 文件
+            ARCHIVE="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -E '^incoming/[^/]+\.zip$' | head -n 1 || true)"
+          fi
+          if [ -z "$ARCHIVE" ] || [ ! -f "$ARCHIVE" ]; then
+            echo "::error::找不到 ZIP 文件。请将 ZIP 上传到 incoming/ 文件夹，或手动运行工作流并填写 zip_path。"
+            exit 1
+          fi
+          case "$ARCHIVE" in
+            incoming/*.zip) ;;
+            *) echo "::error::只允许解压 incoming/ 文件夹内的 ZIP 文件"; exit 1 ;;
+          esac
+          python - "$ARCHIVE" <<'PY'
+          import os, sys, zipfile
+          from pathlib import Path, PurePosixPath
+
+          archive = Path(sys.argv[1])
+          root = Path.cwd().resolve()
+          if not zipfile.is_zipfile(archive):
+              raise SystemExit(f"不是有效的 ZIP 文件：{archive}")
+          with zipfile.ZipFile(archive) as z:
+              members = z.infolist()
+              if len(members) > 10000:
+                  raise SystemExit("ZIP 内文件数量超过 10000，已停止解压")
+              total = sum(x.file_size for x in members)
+              if total > 500 * 1024 * 1024:
+                  raise SystemExit("ZIP 解压后超过 500 MB，已停止解压")
+              for item in members:
+                  name = item.filename.replace("\\", "/")
+                  p = PurePosixPath(name)
+                  if p.is_absolute() or ".." in p.parts:
+                      raise SystemExit(f"检测到不安全路径：{name}")
+                  if not p.parts or p.parts[0] in (".git", ".github", "__MACOSX"):
+                      continue
+                  if p.name == ".DS_Store":
+                      continue
+                  destination = (root / Path(*p.parts)).resolve()
+                  if root not in destination.parents and destination != root:
+                      raise SystemExit(f"文件路径越界：{name}")
+                  if item.is_dir():
+                      destination.mkdir(parents=True, exist_ok=True)
+                  else:
+                      destination.parent.mkdir(parents=True, exist_ok=True)
+                      with z.open(item) as src, open(destination, "wb") as dst:
+                          while chunk := src.read(1024 * 1024):
+                              dst.write(chunk)
+          print(f"已解压 {archive}，共处理 {len(members)} 个 ZIP 条目")
+          PY
+          rm -- "$ARCHIVE"
+
+      - name: Commit extracted files
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "没有检测到文件变化，无需提交。"
+            exit 0
+          fi
+          git commit -m "解压上传的项目文件"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
