@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+  height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+canvas {
+  touch-action: none;
+}
+
+body {
+  font-family: 'Pixelify Sans', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', 'Courier New', monospace;
+  -webkit-font-smoothing: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  cursor: default;
+}
+
+.mc-text {
+  color: #fff;
+  text-shadow: 2px 2px 0 #3e3e3e;
+}
+
+.mc-btn {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  background: #707070;
+  color: #e8e8e8;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.42), inset -2px -4px 0 rgba(0, 0, 0, 0.42);
+  text-shadow: 2px 2px 0 #3e3e3e;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+/* 仅在支持悬停的设备上启用 hover,避免触屏点按后高亮一直粘着 */
+@media (hover: hover) {
+  .mc-btn:hover:not(:disabled) {
+    background: #7686bd;
+    border-color: #fff;
+    color: #ffffa0;
+    text-shadow: 2px 2px 0 #3f3f28;
+  }
+}
+
+/* 触屏按下反馈 */
+.mc-btn:active:not(:disabled) {
+  background: #7686bd;
+  border-color: #fff;
+  color: #ffffa0;
+  text-shadow: 2px 2px 0 #3f3f28;
+}
+
+.mc-btn:disabled {
+  background: #4f4f4f;
+  color: #9a9a9a;
+  cursor: not-allowed;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.15), inset -2px -4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.mc-handle {
+  background: #6f6f6f;
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.5), inset -2px -2px 0 rgba(0, 0, 0, 0.4);
+}
+
+@media (hover: hover) {
+  .mc-slider:hover .mc-handle {
+    background: #8793c8;
+    border-color: #fff;
+  }
+}
+
+.mc-slider:active .mc-handle {
+  background: #8793c8;
+  border-color: #fff;
+}
+
+/* 触屏:加大点按区域 */
+@media (pointer: coarse) {
+  .mc-btn {
+    height: 46px;
+  }
+  .mc-slider {
+    height: 46px;
+  }
+}
+
+/* 可滚动的菜单页(横屏矮屏幕装不下时上下滑动) */
+.menu-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+.menu-scroll > * {
+  flex-shrink: 0;
+}
+
+/* 竖屏提示:仅触屏设备渲染,且仅在竖屏时显示 */
+.portrait-only {
+  display: none;
+}
+@media (orientation: portrait) {
+  .portrait-only {
+    display: block;
+  }
+}
+
+/* 屏幕四角的文字避开刘海 / 圆角 / Home 条 */
+.safe-tl {
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: calc(8px + env(safe-area-inset-left, 0px));
+}
+.safe-bl {
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  left: calc(8px + env(safe-area-inset-left, 0px));
+}
+.safe-br {
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  right: calc(8px + env(safe-area-inset-right, 0px));
+}
+
+/* ------------------------------ 触控按键(基岩版经典触控样式) ------------------------------ */
+
+.tc-root {
+  --tc-cell: 58px;
+  --tc-jump: 76px;
+  --tc-sneak: 54px;
+  --tc-edge: 18px;
+  --tc-l: calc(var(--tc-edge) + env(safe-area-inset-left, 0px));
+  --tc-r: calc(var(--tc-edge) + env(safe-area-inset-right, 0px));
+  --tc-b: calc(var(--tc-edge) + env(safe-area-inset-bottom, 0px));
+}
+@media (max-height: 430px) {
+  .tc-root {
+    --tc-cell: 48px;
+    --tc-jump: 62px;
+    --tc-sneak: 46px;
+    --tc-edge: 12px;
+  }
+}
+
+.tc-btn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: rgba(128, 128, 128, 0.5);
+  border: 2px solid rgba(0, 0, 0, 0.75);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.28), inset -2px -2px 0 rgba(0, 0, 0, 0.3);
+  touch-action: none;
+  pointer-events: auto;
+}
+.tc-btn[data-pressed='1'] {
+  background: rgba(196, 196, 196, 0.66);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.5), inset -2px -2px 0 rgba(0, 0, 0, 0.12);
+}
+.tc-btn[data-sprint='1'] {
+  background: rgba(255, 238, 120, 0.7);
+}
+.tc-arrow {
+  width: 58%;
+  height: 58%;
+  pointer-events: none;
+}
+
+/* 十字键:3×3 网格,只有上下左右四格有按钮,四个角用来斜向移动 */
+.tc-dpad {
+  position: absolute;
+  left: var(--tc-l);
+  bottom: var(--tc-b);
+  width: calc(var(--tc-cell) * 3);
+  height: calc(var(--tc-cell) * 3);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  touch-action: none;
+  pointer-events: auto;
+}
+.tc-dpad .tc-btn {
+  position: relative;
+  pointer-events: none;
+}
+.tc-d-up {
+  grid-area: 1 / 2;
+}
+.tc-d-left {
+  grid-area: 2 / 1;
+}
+.tc-d-right {
+  grid-area: 2 / 3;
+}
+.tc-d-down {
+  grid-area: 3 / 2;
+}
+
+.tc-jump {
+  width: var(--tc-jump);
+  height: var(--tc-jump);
+  right: var(--tc-r);
+  bottom: var(--tc-b);
+}
+.tc-sneak {
+  width: var(--tc-sneak);
+  height: var(--tc-sneak);
+  right: calc(var(--tc-r) + (var(--tc-jump) - var(--tc-sneak)) / 2);
+  bottom: calc(var(--tc-b) + var(--tc-jump) + 10px);
+}
+.tc-pause {
+  width: 40px;
+  height: 40px;
+  left: 50%;
+  margin-left: -20px;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+}
+
+.dirt-bg {
+  background-size: 64px 64px;
+  image-rendering: pixelated;
+}
+
+.splash {
+  animation: splash-pulse 0.5s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+
+@keyframes splash-pulse {
+  from {
+    transform: rotate(-18deg) scale(1);
+  }
+  to {
+    transform: rotate(-18deg) scale(1.1);
+  }
+}
+
+@keyframes fade-from-black {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.hotbar-slot {
+  box-shadow: inset 2px 2px 0 #373737, inset -2px -2px 0 #fff;
+}
