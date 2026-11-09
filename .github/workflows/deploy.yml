@@ -39,7 +39,16 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Prepare licensed Minecraft 26.3 block textures
+      - name: Fetch exact Minecraft 26.3 textures from InventivetalentDev
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --filter=blob:none --sparse --branch 26.3 https://github.com/InventivetalentDev/minecraft-assets.git /tmp/minecraft-assets
+          git -C /tmp/minecraft-assets sparse-checkout set assets/minecraft/textures
+          test -s /tmp/minecraft-assets/assets/minecraft/textures/block/oak_leaves.png
+          test -s /tmp/minecraft-assets/assets/minecraft/textures/item/diamond.png
+      - name: Build vanilla 26.3 block and item textures
+        env:
+          MINECRAFT_TEXTURES_DIR: /tmp/minecraft-assets/assets/minecraft/textures
         run: |
           python -m pip install --disable-pip-version-check pillow
           python scripts/build_texture_atlas.py
