@@ -1,4 +1,4 @@
-import { HOTBAR, blockIcon } from './world'
+import { BLOCKS, HOTBAR, blockIcon } from './world'
 
 type Props = {
   selected: number
@@ -14,7 +14,7 @@ const NAMES: Record<number, string> = {
 }
 
 export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose }: Props) {
-  const items: (number | null)[] = [...HOTBAR, ...Array.from({ length: 18 }, () => null)]
+  const items: number[] = [...BLOCKS]
   return (
     <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-3" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <section className="w-[min(560px,96vw)] border-4 border-[#242424] bg-[#c6c6c6] p-3 text-[#202020] shadow-[0_8px_32px_#0009]" aria-label="背包物品栏">
@@ -22,15 +22,15 @@ export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose
           <h2 className="font-bold text-lg">物品栏</h2>
           <button className="border-2 border-[#333] bg-[#8b8b8b] px-3 py-1 text-white" onClick={onClose}>关闭 ×</button>
         </header>
-        <div className="mb-2 text-xs text-[#444]">可用方块 · 点击后放入当前选中的快捷栏位置</div>
+        <div className="mb-2 text-xs text-[#444]">全部可用方块 · 共 {BLOCKS.length} 种 · 点击后放入当前选中的快捷栏位置</div>
         <div className="grid grid-cols-9 gap-1">
           {items.map((id, i) => (
-            <button key={i} disabled={id === null} draggable={id !== null}
-              onDragStart={(e) => { if (id !== null) e.dataTransfer.setData('text/plain', String(id)) }}
-              onClick={() => { if (id !== null) onEquip(id) }}
-              title={id === null ? '空槽' : NAMES[id] || '方块'} aria-label={id === null ? `背包空槽 ${i + 1}` : `${NAMES[id] || '方块'}，放入当前快捷栏槽位`}
+            <button key={i} draggable
+              onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(id)) }}
+              onClick={() => onEquip(id)}
+              title={NAMES[id] || '方块'} aria-label={`${NAMES[id] || '方块'}，放入当前快捷栏槽位`}
               className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444] active:bg-[#aaa]">
-              {id !== null && <>
+              {<>
                 <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
               </>}
             </button>
