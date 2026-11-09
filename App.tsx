@@ -141,6 +141,7 @@ export default function App() {
   const go = useCallback((s: Screen) => {
     screenRef.current = s
     setScreenState(s)
+    setInventoryOpen(false)
     engineRef.current?.setActive(s === 'playing')
   }, [])
 
@@ -196,6 +197,8 @@ export default function App() {
   useEffect(() => {
     const onInventoryKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyE' || screenRef.current !== 'playing' || e.repeat) return
+      const target = e.target
+      if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
       e.preventDefault()
       setInventoryOpen((open) => {
         const next = !open
@@ -445,7 +448,7 @@ export default function App() {
               return next
             })
           }}
-          onClose={() => { setInventoryOpen(false); engineRef.current?.setActive(true) }}
+          onClose={() => { setInventoryOpen(false); if (screenRef.current === 'playing') engineRef.current?.setActive(true) }}
         />
       )}
 
