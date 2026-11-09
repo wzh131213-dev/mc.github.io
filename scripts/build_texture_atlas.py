@@ -84,7 +84,7 @@ def pick(textures, name, face):
         if base.endswith(suffix):
             base = base[:-len(suffix)]
             break
-    candidates = [base, base.replace("_planks", "_planks"), base.replace("_block", ""), "stone"]
+    candidates = [base, base + "_planks", base + "_log", base + "_block", base.replace("_block", ""), "stone"]
     for candidate in candidates:
         if candidate in textures:
             return textures[candidate]
