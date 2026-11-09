@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import MINECRAFT_REGISTRY from './minecraft-26.3-registry.json'
 import MINECRAFT_ZH_CN from './minecraft-26.3-zh-cn.json'
-import { BLOCK_ID_BY_NAME, BLOCK_META_BY_NAME, blockIcon } from './world'
+import { BLOCK_ID_BY_NAME, BLOCK_META_BY_NAME, blockIcon, onAtlasReady } from './world'
 
 export type InventoryStack = { itemId: number; count: number } | null
 
@@ -103,6 +103,8 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
   const [category, setCategory] = useState<Category>('全部')
   const [query, setQuery] = useState('')
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null)
+  const [, setAtlasVersion] = useState(0)
+  useEffect(() => onAtlasReady(() => setAtlasVersion((version) => version + 1)), [])
   const categorized = useMemo(() => MINECRAFT_REGISTRY.items.map((item) => ({ item, category: categoryOf(item) })), [])
   const visibleItems = useMemo(() => {
     const q = query.trim().toLocaleLowerCase()
