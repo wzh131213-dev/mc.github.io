@@ -36,3 +36,8 @@ npx tsc --noEmit
 ```
 
 The project is configured for GitHub Pages under `/mc.github.io/`.
+
+
+## 背包整合阶段
+
+当前分支开始将物品栏接入原有 React/Three.js 游戏入口：游戏中按 `E` 打开背包，点击物品可替换当前选中的快捷栏槽位，`Esc` 关闭背包。该阶段先接入现有世界已经支持的基础方块；完整 Minecraft Java 1.20.4 方块/物品注册表、生物实体与行为、掉落和合成仍需后续分阶段实现，不能将本阶段误认为完整原版内容已经全部完成。
