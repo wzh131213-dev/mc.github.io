@@ -460,9 +460,9 @@ export class World {
 
   set(x: number, y: number, z: number, b: number) {
     if (y < 0 || y >= SY) return
+    if (!Number.isInteger(b) || (b !== AIR && !BLOCKS.includes(b as (typeof BLOCKS)[number]))) return
     const c = this.getChunk(x >> 4, z >> 4)
     c.data[(y * CS + (z & 15)) * CS + (x & 15)] = b
-    if (!Number.isInteger(b) || (b !== AIR && !BLOCKS.includes(b as (typeof BLOCKS)[number]))) return
     c.modified = true
     if (y > c.maxY) c.maxY = y
   }
