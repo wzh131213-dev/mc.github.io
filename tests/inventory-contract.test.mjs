@@ -269,3 +269,10 @@ test('animated vanilla item textures use a valid static inventory frame instead 
   assert.match(inventory, /crossbow: 'crossbow_standby'/)
   assert.match(inventory, /itemTextureName\(name\)/)
 })
+
+
+test('starting the game never forces fullscreen or locks screen orientation', async () => {
+  const app = await read('App.tsx')
+  assert.doesNotMatch(app, /requestFullscreen|enterFullscreen|orientation\.lock/)
+  assert.match(app, /const startGame = \(\) => \{[\s\S]*?go\('loading'\)/)
+})
