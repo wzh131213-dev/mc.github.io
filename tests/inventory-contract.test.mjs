@@ -129,3 +129,38 @@ test('creative inventory browses the full item catalog with search and category 
   assert.match(inventory, /1657|itemCount/)
   assert.match(inventory, /BLOCK_ID_BY_NAME/)
 })
+
+
+test('26.3 item and block registry IDs are unique and every block item maps to a placeable block', async () => {
+  const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
+  const blockNames = new Set(registry.blocks.map((block) => block.name))
+  const itemNames = new Set(registry.items.map((item) => item.name))
+  const blockIds = new Set(registry.blocks.map((block) => block.id))
+  const itemIds = new Set(registry.items.map((item) => item.id))
+  assert.equal(blockNames.size, registry.blocks.length)
+  assert.equal(itemNames.size, registry.items.length)
+  assert.equal(blockIds.size, registry.blocks.length)
+  assert.equal(itemIds.size, registry.items.length)
+  assert.ok(registry.items.every((item) => Number.isInteger(item.id) && item.stack >= 1 && item.stack <= 64))
+  assert.ok(registry.items.filter((item) => item.block).every((item) => blockNames.has(item.name)))
+})
+
+test('player storage saves a 27-slot bag and validates restored item stacks', async () => {
+  const app = await read('App.tsx')
+  const inventory = await read('Inventory.tsx')
+  assert.match(app, /BAG_STORAGE_KEY = 'mc-web-inventory:v1'/)
+  assert.match(app, /function readSavedInventory\(\)/)
+  assert.match(app, /value\.length === 27/)
+  assert.match(app, /window\.localStorage\.setItem\(BAG_STORAGE_KEY/)
+  assert.match(app, /setBagSlots\(\(current\)/)
+  assert.match(inventory, /玩家背包 · 27 格/)
+  assert.match(inventory, /onRemove/)
+})
+
+test('existing legacy block IDs remain unchanged when the 26.3 registry is added', async () => {
+  const world = await read('world.ts')
+  for (const [name, id] of [['GRASS', 1], ['DIRT', 2], ['STONE', 3], ['SAND', 4], ['WATER', 5], ['LOG', 6], ['LEAVES', 7], ['PLANKS', 8], ['COBBLE', 9], ['GLASS', 10]]) {
+    assert.match(world, new RegExp(`export const ${name} = ${id}`))
+  }
+  assert.match(world, /EXTRA_BLOCK_ID_BASE = 4096/)
+})
