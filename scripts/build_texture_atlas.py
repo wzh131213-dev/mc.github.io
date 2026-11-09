@@ -278,7 +278,7 @@ def main():
     item_count = sum(1 for path in item_out.rglob("*.png"))
     shutil.copyfile(ROOT / "TEXTURE_CREDITS.md", CREDITS_OUT)
     print(f"InventivetalentDev minecraft-assets {version}: {len(textures)} vanilla block textures; {item_count} item textures")
-    print(f"Mapped {matched}/{len(REGISTRY["blocks"]) * 3} block faces from vanilla model references")
+    print(f"Mapped {matched}/{len(REGISTRY['blocks']) * 3} block faces from vanilla model references")
     print(f"Atlas: {OUT} ({atlas.width}x{atlas.height})")
 
 if __name__ == "__main__":
