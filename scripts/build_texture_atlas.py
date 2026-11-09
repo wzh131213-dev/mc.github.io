@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a compact per-block atlas from the CC BY-SA 4.0 Fresh Textures pack (26.3)."""
+"""Build block and item textures from InventivetalentDev Minecraft Java 26.3 assets."""
 import hashlib
 import io
 import json
@@ -16,7 +16,7 @@ OUT = ROOT / "public" / "vanilla-block-atlas.png"
 CREDITS_OUT = ROOT / "public" / "TEXTURE_CREDITS.md"
 TILE = 16
 GRID = 64
-HEADERS = {"User-Agent": "mc.github.io texture-atlas-builder/1.0 (CC-BY-SA-4.0 attribution)"}
+HEADERS = {"User-Agent": "mc.github.io texture-atlas-builder/1.0"}
 
 def get(url):
     req = urllib.request.Request(url, headers=HEADERS)
@@ -88,6 +88,31 @@ def legacy_fallback(key):
     elif pattern == "stone":
         for x in range(0, TILE, 4):
             draw.line((x, 0, x, 15), fill=(105, 107, 109, 255))
+    return image
+
+def fallback(name, face_index):
+    """Deterministic per-block fallback when the vanilla model texture cannot be resolved."""
+    digest = hashlib.sha256(f"{name}:{face_index}".encode("utf-8")).digest()
+    base = tuple(48 + value % 160 for value in digest[:3])
+    image = Image.new("RGBA", (TILE, TILE), (*base, 255))
+    draw = ImageDraw.Draw(image)
+    accent = tuple(min(255, value + 38) for value in base) + (255,)
+    shadow = tuple(max(0, value - 38) for value in base) + (255,)
+    for y in range(TILE):
+        for x in range(TILE):
+            if (x * (digest[3] % 7 + 2) + y * (digest[4] % 9 + 2) + digest[5]) % 13 < 3:
+                draw.point((x, y), fill=accent)
+            elif (x + y + digest[6]) % 11 == 0:
+                draw.point((x, y), fill=shadow)
+    # A subtle face-specific pattern makes top/bottom/side fallback tiles distinct.
+    if face_index == 0:
+        draw.rectangle((1, 1, 14, 14), outline=accent, width=1)
+    elif face_index == 1:
+        draw.line((0, 4, 15, 4), fill=shadow, width=2)
+        draw.line((0, 11, 15, 11), fill=accent, width=1)
+    else:
+        draw.line((4, 0, 4, 15), fill=shadow, width=1)
+        draw.line((11, 0, 11, 15), fill=accent, width=1)
     return image
 
 def load_vanilla_model_resolver():
