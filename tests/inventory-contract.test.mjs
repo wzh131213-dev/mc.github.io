@@ -79,3 +79,27 @@ test('the production build is configured for the project Pages base path', async
   const vite = await read('vite.config.ts')
   assert.match(vite, /base: '\.\/'/)
 })
+
+
+test('modified chunks are saved per world seed and safely restored on demand', async () => {
+  const world = await read('world.ts')
+  const engine = await read('engine.ts')
+  assert.match(world, /WORLD_SAVE_PREFIX = 'mc-web-world:v1:'/)
+  assert.match(world, /private restoreChunk\(chunk: Chunk\)/)
+  assert.match(world, /private persistChunk\(chunk: Chunk\): boolean/)
+  assert.match(world, /this\.restoreChunk\(c\)/)
+  assert.match(world, /chunk\.overrides\.set\(index, block\)/)
+  assert.match(world, /this\.storage\.setItem\(key, JSON\.stringify/)
+  assert.match(world, /this\.persistChunk\(c\)/)
+  assert.match(world, /save\(\): boolean/)
+  assert.match(engine, /saveWorld\(\)/)
+})
+
+test('hotbar layout survives reload and save failures are shown to the player', async () => {
+  const app = await read('App.tsx')
+  assert.match(app, /HOTBAR_STORAGE_KEY = 'mc-web-hotbar:v1'/)
+  assert.match(app, /function readSavedHotbar\(\)/)
+  assert.match(app, /window\.localStorage\.setItem\(HOTBAR_STORAGE_KEY/)
+  assert.match(app, /eng\?\.saveWorld\(\)/)
+  assert.match(app, /本地存储不可用：当前世界修改可能无法保存/)
+})
