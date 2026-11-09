@@ -23,53 +23,20 @@ def get(url):
     with urllib.request.urlopen(req, timeout=90) as response:
         return response.read()
 
-def find_pack():
-    query = urllib.parse.urlencode({"game_versions": json.dumps(["26.3"])})
-    versions = json.loads(get("https://api.modrinth.com/v2/project/fresh-textures/version?" + query))
-    if not versions:
-        raise RuntimeError("Modrinth returned no Fresh Textures release for Minecraft 26.3")
-    versions.sort(key=lambda v: v.get("date_published", ""), reverse=True)
-    version = versions[0]
-    files = version.get("files", [])
-    if not files:
-        raise RuntimeError("Fresh Textures version has no downloadable files")
-    file = next((f for f in files if f.get("primary")), files[0])
-    payload = get(file["url"])
-    expected = file.get("hashes", {}).get("sha512")
-    if expected and hashlib.sha512(payload).hexdigest() != expected:
-        raise RuntimeError("Fresh Textures SHA-512 verification failed")
-    return zipfile.ZipFile(io.BytesIO(payload)), version.get("version_number", "unknown")
-
-def load_textures(pack):
+def load_textures(texture_root):
+    """Load exact vanilla 26.3 block PNGs from InventivetalentDev/minecraft-assets."""
+    block_root = Path(texture_root) / "block"
+    if not block_root.is_dir():
+        raise RuntimeError(f"Missing vanilla block texture directory: {block_root}")
     result = {}
-    for name in pack.namelist():
-        prefix = "assets/minecraft/textures/block/"
-        if name.startswith(prefix) and name.lower().endswith(".png"):
-            key = name[len(prefix):-4]
-            try:
-                image = Image.open(io.BytesIO(pack.read(name))).convert("RGBA")
-                result[key] = image.resize((TILE, TILE), Image.Resampling.NEAREST)
-            except Exception:
-                continue
+    for path in block_root.rglob("*.png"):
+        key = path.relative_to(block_root).with_suffix("").as_posix()
+        try:
+            image = Image.open(path).convert("RGBA")
+            result[key] = image.resize((TILE, TILE), Image.Resampling.NEAREST)
+        except Exception as exc:
+            print(f"Skipping unreadable texture {path}: {exc}")
     return result
-
-def fallback(name, face):
-    digest = hashlib.sha256((name + ":" + str(face)).encode()).digest()
-    base = [55 + digest[0] % 150, 55 + digest[1] % 150, 55 + digest[2] % 150]
-    image = Image.new("RGBA", (TILE, TILE), (*base, 255))
-    draw = ImageDraw.Draw(image)
-    kind = digest[3] % 5
-    for y in range(TILE):
-        for x in range(TILE):
-            if kind == 0 and (x + y) % 5 == 0:
-                draw.point((x, y), fill=tuple(max(0, c - 35) for c in base) + (255,))
-            elif kind == 1 and (x % 4 == 0 or y % 4 == 0):
-                draw.point((x, y), fill=tuple(max(0, c - 30) for c in base) + (255,))
-            elif kind == 2 and (x * 3 + y * 5 + digest[4]) % 11 == 0:
-                draw.point((x, y), fill=tuple(min(255, c + 35) for c in base) + (255,))
-            elif kind == 3 and x in (0, 15) or kind == 3 and y in (0, 15):
-                draw.point((x, y), fill=(220, 220, 220, 255))
-    return image
 
 def legacy_fallback(key):
     """Use recognizable Minecraft-like colors when a pack omits a core legacy tile."""
@@ -249,8 +216,9 @@ def pick(textures, name, face, model_texture=None):
     return None
 
 def main():
-    pack, version = find_pack()
-    textures = load_textures(pack)
+    texture_root = Path(__import__("os").environ.get("MINECRAFT_TEXTURES_DIR", ROOT / "assets" / "minecraft" / "textures"))
+    textures = load_textures(texture_root)
+    version = "26.3"
     vanilla_faces = load_vanilla_model_resolver()
     if len(textures) < 80:
         raise RuntimeError(f"Texture pack extraction suspiciously small: {len(textures)} textures")
@@ -300,9 +268,17 @@ def main():
             atlas.paste(image, ((tile % GRID) * TILE, (tile // GRID) * TILE))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     atlas.save(OUT, optimize=True)
+    item_root = texture_root / "item"
+    item_out = ROOT / "public" / "minecraft-item-textures"
+    if not item_root.is_dir():
+        raise RuntimeError(f"Missing vanilla item texture directory: {item_root}")
+    if item_out.exists():
+        shutil.rmtree(item_out)
+    shutil.copytree(item_root, item_out)
+    item_count = sum(1 for path in item_out.rglob("*.png"))
     shutil.copyfile(ROOT / "TEXTURE_CREDITS.md", CREDITS_OUT)
-    print(f"Fresh Textures {version} (CC BY-SA 4.0): {len(textures)} source textures")
-    print(f"Mapped {matched}/{len(REGISTRY['blocks']) * 3} block faces; unique fallback faces generated for missing names")
+    print(f"InventivetalentDev minecraft-assets {version}: {len(textures)} vanilla block textures; {item_count} item textures")
+    print(f"Mapped {matched}/{len(REGISTRY["blocks"]) * 3} block faces from vanilla model references")
     print(f"Atlas: {OUT} ({atlas.width}x{atlas.height})")
 
 if __name__ == "__main__":
