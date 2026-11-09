@@ -16,6 +16,7 @@ export const PLANKS = 8
 export const COBBLE = 9
 export const GLASS = 10
 
+export const BLOCKS = [GRASS, DIRT, STONE, SAND, WATER, LOG, LEAVES, PLANKS, COBBLE, GLASS] as const
 export const HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, SAND, GLASS, LEAVES]
 
 const TILE = 16
