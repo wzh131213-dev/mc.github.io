@@ -225,6 +225,8 @@ test('inventory uses vanilla item PNGs instead of emoji or generated color place
   const builder = await read('scripts/build_texture_atlas.py')
   assert.ok(builder.includes('shutil.copytree(item_root, item_out)'))
   assert.ok(builder.includes('minecraft-item-textures'))
+  assert.ok(builder.includes('def fallback(name, face_index):'))
+  assert.ok(builder.includes('hashlib.sha256(f"{name}:{face_index}".encode("utf-8")).digest()'))
 })
 
 test('title screen uses ME WORLD branding and displays the requested Minecraft disclaimer', async () => {
