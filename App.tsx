@@ -73,22 +73,6 @@ const TIPS = 'WASD 移动 · 空格 跳跃(双击飞行) · Shift 疾跑 · 左�
 const TIPS_TOUCH =
   '左下十字键 移动(连点两下 ↑ 疾跑) · 屏幕上滑动 转视角 · 轻点 放置方块 · 长按 破坏方块 · 连点两下跳跃键 飞行 · 右上角背包 · 点快捷栏切换方块'
 
-/** 尝试进入全屏并锁定横屏(Android Chrome 等支持;iOS Safari 会静默忽略) */
-function enterFullscreen() {
-  try {
-    const el = document.documentElement
-    if (document.fullscreenElement || !el.requestFullscreen) return
-    Promise.resolve(el.requestFullscreen({ navigationUI: 'hide' }))
-      .then(() => {
-        const o = screen.orientation as unknown as { lock?: (o: string) => Promise<void> }
-        return o.lock?.('landscape')
-      })
-      .catch(() => {})
-  } catch {
-    /* 忽略 */
-  }
-}
-
 function McButton({
   children,
   onClick,
@@ -336,7 +320,6 @@ export default function App() {
   const startGame = () => {
     setSaveWarning(false)
     engineRef.current?.lock()
-    if (engineRef.current?.touchMode) enterFullscreen()
     go('loading')
   }
 
