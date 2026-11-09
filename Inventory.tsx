@@ -101,10 +101,12 @@ function itemColor(name: string) {
 
 const ITEM_TEXTURE_BASE = `${import.meta.env.BASE_URL}minecraft-item-textures/`
 
-function ItemTexture({ name, className = 'h-8 w-8' }: { name: string; className?: string }) {
+function ItemTexture({ name, className = 'h-8 w-8', fallbackSrc }: { name: string; className?: string; fallbackSrc?: string }) {
   const [failed, setFailed] = useState(false)
   if (failed) {
-    return <span className={`flex ${className} items-center justify-center text-[17px] font-bold`} aria-hidden="true">{itemGlyph(name)}</span>
+    return fallbackSrc
+      ? <img src={fallbackSrc} alt="" className={`${className} object-contain`} style={{ imageRendering: 'pixelated' }} />
+      : <span className={`flex ${className} items-center justify-center text-[17px] font-bold`} aria-hidden="true">{itemGlyph(name)}</span>
   }
   return <img
     src={`${ITEM_TEXTURE_BASE}${encodeURIComponent(name)}.png`}
@@ -164,11 +166,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
               <button key={item.id} onClick={() => { setSelectedItem(item); if (blockId !== undefined) onGive(item.id, item.stack) }}
                 title={itemName(item)} aria-label={itemName(item)}
                 className={`flex min-h-[68px] min-w-0 flex-col items-center justify-center gap-1 border-2 p-1 ${isSelected ? 'border-white bg-[#557b9d]' : 'border-[#555] bg-[#999] hover:bg-[#b2b2b2]'}`}>
-                {blockId !== undefined ? (
-                  <img src={blockIcon(blockId)} alt="" className="h-8 w-8 object-contain" style={{ imageRendering: 'pixelated' }} />
-                ) : (
-                  <ItemTexture name={item.name} />
-                )}
+                <ItemTexture name={item.name} fallbackSrc={blockId !== undefined ? blockIcon(blockId) : undefined} />
                 <span className="w-full truncate text-center text-[10px] leading-tight text-[#171717]">{itemName(item)}</span>
               </button>
             )
@@ -202,9 +200,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
                 title={stack && item ? `${itemName(item)} × ${stack.count}` : `背包空格 ${i + 1}`}
                 aria-label={stack && item ? `${itemName(item)}，数量 ${stack.count}` : `背包空格 ${i + 1}`}
                 className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444]">
-                {stack && item && (blockId !== undefined
-                  ? <img src={blockIcon(blockId)} alt="" className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
-                  : <ItemTexture name={item.name} className="h-full w-full" />)}
+                {stack && item && <ItemTexture name={item.name} className="h-full w-full" fallbackSrc={blockId !== undefined ? blockIcon(blockId) : undefined} />}
                 {stack && <span className="absolute right-0 bottom-0 rounded-sm bg-black/75 px-1 text-[10px] font-bold text-white">{stack.count}</span>}
               </button>
             )
