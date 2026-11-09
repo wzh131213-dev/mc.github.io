@@ -37,7 +37,7 @@ const BLOCK_TILES: Record<number, [number, number, number]> = {
 }
 
 // blocks that hide neighbouring faces
-const OCC = new Uint8Array(16)
+const OCC = new Uint8Array(256)
 ;[GRASS, DIRT, STONE, SAND, LOG, PLANKS, COBBLE].forEach((b) => (OCC[b] = 1))
 
 export function mulberry32(a: number) {
@@ -241,7 +241,7 @@ export function blockIcon(b: number) {
   c.height = 48
   const ctx = c.getContext('2d')!
   ctx.imageSmoothingEnabled = false
-  const [top, , side] = BLOCK_TILES[b]
+  const [top, , side] = BLOCK_TILES[b] ?? BLOCK_TILES[STONE]
   const draw = (tile: number, m: [number, number, number, number, number, number], shade: number) => {
     ctx.save()
     ctx.setTransform(...m)
@@ -462,6 +462,7 @@ export class World {
     if (y < 0 || y >= SY) return
     const c = this.getChunk(x >> 4, z >> 4)
     c.data[(y * CS + (z & 15)) * CS + (x & 15)] = b
+    if (!Number.isInteger(b) || (b !== AIR && !BLOCKS.includes(b as (typeof BLOCKS)[number]))) return
     c.modified = true
     if (y > c.maxY) c.maxY = y
   }
@@ -562,6 +563,7 @@ export class World {
           const isWater = b === WATER
           const md = isWater ? w : o
           const tiles = BLOCK_TILES[b]
+          if (!tiles) continue
           for (const f of FACES) {
             const nb = this.get(x + f.n[0], y + f.n[1], z + f.n[2])
             if (isWater) {
