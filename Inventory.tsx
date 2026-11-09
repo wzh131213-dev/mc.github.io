@@ -95,6 +95,18 @@ function itemGlyph(name: string) {
 
 const ITEM_TEXTURE_BASE = new URL('minecraft-item-textures/', document.baseURI).toString()
 
+// These vanilla icons are animated or have a dedicated inventory/standby sprite.
+// Their canonical item IDs do not have a same-named PNG in the 26.3 texture pack.
+const ITEM_TEXTURE_OVERRIDES: Record<string, string> = {
+  compass: 'compass_00',
+  clock: 'clock_00',
+  crossbow: 'crossbow_standby',
+}
+
+function itemTextureName(name: string) {
+  return ITEM_TEXTURE_OVERRIDES[name] || name
+}
+
 function ItemTexture({ name, className = 'h-8 w-8', fallbackSrc }: { name: string; className?: string; fallbackSrc?: string }) {
   const [failed, setFailed] = useState(false)
   if (failed) {
@@ -103,7 +115,7 @@ function ItemTexture({ name, className = 'h-8 w-8', fallbackSrc }: { name: strin
       : <span className={`flex ${className} items-center justify-center text-[17px] font-bold`} aria-hidden="true">{itemGlyph(name)}</span>
   }
   return <img
-    src={`${ITEM_TEXTURE_BASE}${encodeURIComponent(name)}.png`}
+    src={`${ITEM_TEXTURE_BASE}${encodeURIComponent(itemTextureName(name))}.png`}
     alt=""
     className={`${className} object-contain`}
     style={{ imageRendering: 'pixelated' }}
