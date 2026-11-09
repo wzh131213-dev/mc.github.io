@@ -403,8 +403,10 @@ export default function App() {
             </div>
           </div>
 
+          <p className="mc-text mt-4 mb-10 max-w-[min(560px,92vw)] px-3 text-center text-[11px] leading-relaxed text-white/90 [text-shadow:1px_1px_2px_#000]">
+            Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
+          </p>
           <div className="mc-text safe-bl absolute text-[15px]">我的世界 Java 版 26.3</div>
-          <div className="mc-text safe-br absolute text-[15px]">版权所有 Mojang AB,请勿散布!</div>
         </div>
       )}
 
