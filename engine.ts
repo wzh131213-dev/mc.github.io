@@ -620,7 +620,8 @@ export class Engine {
 
   /** 对准星指向的方块执行破坏 / 放置,成功返回 true */
   private act(kind: 'break' | 'place'): boolean {
-    const hit = this.raycast(6)
+    // 破坏时允许命中水方块；放置时仍把水视为可替换空间。
+    const hit = this.raycast(6, kind === 'break')
     if (!hit) return false
     if (kind === 'break') {
       if (hit.y === 0) return false
@@ -650,7 +651,7 @@ export class Engine {
     return true
   }
 
-  private raycast(maxD: number) {
+  private raycast(maxD: number, includeWater = false) {
     const o = new THREE.Vector3(this.pos.x, this.pos.y + this.eye, this.pos.z)
     const d = new THREE.Vector3()
     this.camera.getWorldDirection(d)
@@ -672,7 +673,7 @@ export class Engine {
     let nz = 0
     while (t <= maxD) {
       const b = this.world.get(x, y, z)
-      if (b !== AIR && b !== WATER) return { x, y, z, nx, ny, nz, b }
+      if (b !== AIR && (includeWater || b !== WATER)) return { x, y, z, nx, ny, nz, b }
       if (tmx < tmy && tmx < tmz) {
         x += sx
         t = tmx
