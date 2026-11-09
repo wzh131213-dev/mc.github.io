@@ -30,9 +30,7 @@ export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose
               onClick={() => onEquip(id)}
               title={NAMES[id] || '方块'} aria-label={`${NAMES[id] || '方块'}，放入当前快捷栏槽位`}
               className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444] active:bg-[#aaa]">
-              {<>
-                <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
-              </>}
+              <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
             </button>
           ))}
         </div>
@@ -40,7 +38,7 @@ export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose
         <div className="grid grid-cols-9 gap-1">
           {hotbar.map((id, i) => (
             <button key={i} onClick={() => onSelect(i)} onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); const value = Number(e.dataTransfer.getData('text/plain')); if (HOTBAR.includes(value)) { onSelect(i); onEquip(value, i) } }}
+              onDrop={(e) => { e.preventDefault(); const value = Number(e.dataTransfer.getData('text/plain')); if (BLOCKS.includes(value as (typeof BLOCKS)[number])) { onSelect(i); onEquip(value, i) } }}
               aria-label={`快捷栏第 ${i + 1} 格：${NAMES[id] || '方块'}`} className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444]"
               style={i === selected ? { outline: '3px solid white', outlineOffset: '-3px' } : undefined}>
               <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full" style={{ imageRendering: 'pixelated' }} />
