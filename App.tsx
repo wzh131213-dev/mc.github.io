@@ -431,6 +431,19 @@ export default function App() {
               </div>
             ))}
           </div>
+          <button
+            type="button"
+            className="pointer-events-auto absolute right-3 rounded border-2 border-black bg-[#707070] px-4 py-2 font-semibold text-white shadow-[inset_2px_2px_0_rgba(255,255,255,0.35),inset_-2px_-2px_0_rgba(0,0,0,0.4)] active:bg-[#8b8b8b]"
+            style={{ top: 'calc(10px + env(safe-area-inset-top, 0px))' }}
+            aria-label="打开背包"
+            aria-expanded={inventoryOpen}
+            onClick={() => {
+              setInventoryOpen(true)
+              engineRef.current?.setActive(false)
+            }}
+          >
+            背包
+          </button>
         </div>
       )}
 
