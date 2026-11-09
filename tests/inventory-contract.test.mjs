@@ -241,3 +241,21 @@ test('pixel logo supports spaces in the ME WORLD title without missing glyphs', 
   assert.ok(logo.includes("' ': ['00000', '00000', '00000', '00000', '00000', '00000', '00000']"))
   assert.ok(logo.includes("const WORD = 'me world'"))
 })
+
+test('bag slots support safe move, merge and swap instead of deleting non-block items on click', async () => {
+  const inventory = await read('Inventory.tsx')
+  const app = await read('App.tsx')
+  assert.match(inventory, /selectedBagSlot/)
+  assert.match(inventory, /onMove\(selectedBagSlot, i\)/)
+  assert.match(inventory, /丢弃整组/)
+  assert.match(inventory, /装备到当前快捷栏/)
+  assert.match(app, /onMove=\{\(from, to\)/)
+  assert.match(app, /target\.itemId === source\.itemId/)
+  assert.match(app, /next\[from\] = target[\s\S]*?next\[to\] = source/)
+})
+
+test('inventory click no longer removes a stack as an accidental side effect', async () => {
+  const inventory = await read('Inventory.tsx')
+  const bagSection = inventory.slice(inventory.indexOf('玩家背包'), inventory.indexOf('快捷栏 ·'))
+  assert.doesNotMatch(bagSection, /else if \(stack\) onRemove\(i\)/)
+})
