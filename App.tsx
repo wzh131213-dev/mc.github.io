@@ -395,7 +395,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="mc-text safe-bl absolute text-[15px]">Minecraft 1.20.4</div>
+          <div className="mc-text safe-bl absolute text-[15px]">Minecraft Java 26.3</div>
           <div className="mc-text safe-br absolute text-[15px]">版权所有 Mojang AB,请勿散布!</div>
         </div>
       )}
@@ -499,7 +499,7 @@ export default function App() {
         <div className="pointer-events-none absolute inset-0 z-10">
           {info.underwater && <div className="absolute inset-0 bg-[#1b4fd6]/35" />}
           <div className="mc-text safe-tl absolute text-[14px] leading-5">
-            <div>Minecraft 1.20.4 (web/vanilla)</div>
+            <div>Minecraft Java 26.3 (web/vanilla)</div>
             <div>{info.text}</div>
             <div>{info.chunkText}</div>
           </div>
