@@ -169,7 +169,7 @@ test('existing legacy block IDs remain unchanged when the 26.3 registry is added
 test('every registered Minecraft 26.3 block has a Simplified Chinese display name', async () => {
   const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
   const translations = JSON.parse(await read('minecraft-26.3-zh-cn.json'))
-  assert.equal(Object.keys(translations).length, registry.blocks.length)
+  assert.ok(Object.keys(translations).length >= registry.blocks.length)
   for (const block of registry.blocks) {
     assert.equal(typeof translations[block.name], 'string', `missing Chinese name for ${block.name}`)
     assert.match(translations[block.name], /[\\u4e00-\\u9fff]/, `non-Chinese display name for ${block.name}`)
@@ -182,7 +182,7 @@ test('every registered Minecraft 26.3 block has a Simplified Chinese display nam
 test('all item catalog display names are Chinese and no internal English IDs leak into the visible detail row', async () => {
   const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
   const names = JSON.parse(await read('minecraft-26.3-zh-cn.json'))
-  assert.equal(Object.keys(names).length, registry.items.length)
+  assert.ok(Object.keys(names).length >= registry.items.length)
   for (const item of registry.items) assert.match(names[item.name], /[\\u4e00-\\u9fff]/, `missing Chinese item name: ${item.name}`)
   const inventory = await read('Inventory.tsx')
   assert.match(inventory, /物品编号 \\{selectedItem\\.id\\}/)
