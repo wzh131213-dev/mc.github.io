@@ -164,3 +164,16 @@ test('existing legacy block IDs remain unchanged when the 26.3 registry is added
   }
   assert.match(world, /EXTRA_BLOCK_ID_BASE = 4096/)
 })
+
+
+test('every registered Minecraft 26.3 block has a Simplified Chinese display name', async () => {
+  const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
+  const translations = JSON.parse(await read('minecraft-26.3-zh-cn.json'))
+  assert.equal(Object.keys(translations).length, registry.blocks.length)
+  for (const block of registry.blocks) {
+    assert.equal(typeof translations[block.name], 'string', `missing Chinese name for ${block.name}`)
+    assert.match(translations[block.name], /[\\u4e00-\\u9fff]/, `non-Chinese display name for ${block.name}`)
+  }
+  const inventory = await read('Inventory.tsx')
+  assert.match(inventory, /MINECRAFT_ZH_CN\\[item\\.name\\]/)
+})
