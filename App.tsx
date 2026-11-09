@@ -431,19 +431,6 @@ export default function App() {
               </div>
             ))}
           </div>
-          <button
-            type="button"
-            className="pointer-events-auto absolute right-3 rounded border-2 border-black bg-[#707070] px-4 py-2 font-semibold text-white shadow-[inset_2px_2px_0_rgba(255,255,255,0.35),inset_-2px_-2px_0_rgba(0,0,0,0.4)] active:bg-[#8b8b8b]"
-            style={{ top: 'calc(10px + env(safe-area-inset-top, 0px))' }}
-            aria-label="打开背包"
-            aria-expanded={inventoryOpen}
-            onClick={() => {
-              setInventoryOpen(true)
-              engineRef.current?.setActive(false)
-            }}
-          >
-            背包
-          </button>
         </div>
       )}
 
@@ -468,6 +455,24 @@ export default function App() {
       {/* ---------------------------- TOUCH CONTROLS ---------------------------- */}
       {touch && screen === 'playing' && (
         <TouchControls engineRef={engineRef} onPause={() => go('paused')} />
+      )}
+
+      {/* 独立背包入口：置于触控视角层之上，确保手机/平板可见且可点 */}
+      {screen === 'playing' && !inventoryOpen && (
+        <button
+          type="button"
+          className="absolute right-3 z-30 flex min-h-12 items-center justify-center gap-2 rounded border-2 border-black bg-[#707070] px-5 py-3 text-base font-bold text-white shadow-[inset_2px_2px_0_rgba(255,255,255,0.4),inset_-2px_-2px_0_rgba(0,0,0,0.45),0_2px_8px_rgba(0,0,0,0.55)] active:bg-[#8b8b8b]"
+          style={{ top: 'calc(12px + env(safe-area-inset-top, 0px))', right: 'calc(12px + env(safe-area-inset-right, 0px))' }}
+          aria-label="打开背包"
+          aria-expanded={inventoryOpen}
+          onClick={() => {
+            setInventoryOpen(true)
+            engineRef.current?.setActive(false)
+          }}
+        >
+          <span aria-hidden="true">▦</span>
+          <span>背包</span>
+        </button>
       )}
 
       {/* ------------------------------ PAUSE ------------------------------ */}
