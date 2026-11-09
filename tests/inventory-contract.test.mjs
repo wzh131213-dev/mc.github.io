@@ -170,38 +170,38 @@ test('existing legacy block IDs remain unchanged when the 26.3 registry is added
 test('every registered Minecraft 26.3 block has a Simplified Chinese display name', async () => {
   const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
   const translations = JSON.parse(await read('minecraft-26.3-zh-cn.json'))
-  assert.ok(Object.keys(translations).length >= registry.blocks.length)
   for (const block of registry.blocks) {
     assert.equal(typeof translations[block.name], 'string', `missing Chinese name for ${block.name}`)
-    assert.match(translations[block.name], /[\\u4e00-\\u9fff]/, `non-Chinese display name for ${block.name}`)
+    assert.doesNotMatch(translations[block.name], /[A-Za-z]/, `English display name for ${block.name}`)
   }
   const inventory = await read('Inventory.tsx')
-  assert.match(inventory, /MINECRAFT_ZH_CN\\[item\\.name\\]/)
+  assert.ok(inventory.includes('MINECRAFT_ZH_CN[item.name]'))
 })
 
-
-test('all item catalog display names are Chinese and no internal English IDs leak into the visible detail row', async () => {
+test('all item catalog display names are Chinese and internal English IDs are not displayed', async () => {
   const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
   const names = JSON.parse(await read('minecraft-26.3-zh-cn.json'))
-  assert.ok(Object.keys(names).length >= registry.items.length)
-  for (const item of registry.items) assert.match(names[item.name], /[\\u4e00-\\u9fff]/, `missing Chinese item name: ${item.name}`)
+  for (const item of registry.items) {
+    assert.equal(typeof names[item.name], 'string', `missing item translation: ${item.name}`)
+    assert.doesNotMatch(names[item.name], /[A-Za-z]/, `English item name: ${item.name}`)
+  }
   const inventory = await read('Inventory.tsx')
-  assert.match(inventory, /物品编号 \\{selectedItem\\.id\\}/)
-  assert.doesNotMatch(inventory, /\\{selectedItem\\.name\\} · 堆叠上限/)
+  assert.ok(inventory.includes('物品编号 {selectedItem.id}'))
+  assert.ok(!inventory.includes('{selectedItem.name} · 堆叠上限'))
 })
 
-test('every registered block gets its own three-face atlas tile and the atlas is a 64 by 64 grid', async () => {
+test('every registered block gets a distinct three-face atlas tile in a 64 by 64 grid', async () => {
   const world = await read('world.ts')
-  assert.match(world, /const TILE_COUNT = 64/)
-  assert.match(world, /12 \\+ index \\* 3/)
-  assert.match(world, /getBlockTiles\\(b\\)/)
-  assert.match(world, /vanilla-block-atlas\\.png/)
-  assert.match(world, /onAtlasReady/)
+  assert.ok(world.includes('const TILE_COUNT = 64'))
+  assert.ok(world.includes('const base = 12 + index * 3'))
+  assert.ok(world.includes('getBlockTiles(b)'))
+  assert.ok(world.includes("new URL('vanilla-block-atlas.png', document.baseURI)"))
+  assert.ok(world.includes('onAtlasReady'))
 })
 
 test('deployment builds the licensed 26.3 texture atlas before Vite packaging', async () => {
   const workflow = await read('.github/workflows/deploy.yml')
-  assert.match(workflow, /build_texture_atlas\\.py/)
-  assert.match(workflow, /pip install pillow/)
-  assert.match(workflow, /Build Vite application/)
+  assert.ok(workflow.includes('scripts/build_texture_atlas.py'))
+  assert.ok(workflow.includes('pip install --disable-pip-version-check pillow'))
+  assert.ok(workflow.includes('Build Vite application'))
 })
