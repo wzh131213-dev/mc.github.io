@@ -272,8 +272,8 @@ export function getAtlas() {
   })
   // Generic procedural tiles used as visual fallbacks for the full 26.3 block registry.
   put(12, (x, y) => { const d = v(13); const grain = (x * 3 + y * 5) % 7 === 0 ? -18 : 0; return [132 + d + grain, 126 + d + grain, 119 + d + grain, 255] })
-  put(13, (x, y) => { const d = v(8) + (x % 4 === 0 ? -12 : 0); return [151 + d, 111 + d * 0.7, 72 + d * 0.5, 255] })
-  put(14, (x, y) => { const r = rnd(); if (r < 0.08) return [0, 0, 0, 0]; const d = v(18); return [70 + d * 0.45, 126 + d, 58 + d * 0.35, 255] })
+  put(13, (x) => { const d = v(8) + (x % 4 === 0 ? -12 : 0); return [151 + d, 111 + d * 0.7, 72 + d * 0.5, 255] })
+  put(14, () => { const r = rnd(); if (r < 0.08) return [0, 0, 0, 0]; const d = v(18); return [70 + d * 0.45, 126 + d, 58 + d * 0.35, 255] })
   put(15, (x, y) => { const d = v(12); const seam = (x % 8 === 0 || y % 8 === 0) ? -14 : 0; return [142 + d + seam, 145 + d + seam, 151 + d + seam, 255] })
 
   atlasCanvas = c
