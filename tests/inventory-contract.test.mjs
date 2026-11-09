@@ -202,7 +202,6 @@ test('deployment fetches InventivetalentDev vanilla 26.3 textures and builds bot
   const workflow = await read('.github/workflows/deploy.yml')
   assert.ok(workflow.includes('InventivetalentDev/minecraft-assets.git'))
   assert.ok(workflow.includes('assets/minecraft/textures'))
-  assert.ok(workflow.includes('minecraft-item-textures'))
   assert.ok(workflow.includes('scripts/build_texture_atlas.py'))
   assert.ok(workflow.includes('pip install --disable-pip-version-check pillow'))
   assert.ok(workflow.includes('Build Vite application'))
@@ -225,4 +224,5 @@ test('inventory uses vanilla item PNGs instead of emoji or generated color place
   assert.ok(inventory.includes('onError={() => setFailed(true)}'))
   const builder = await read('scripts/build_texture_atlas.py')
   assert.ok(builder.includes('shutil.copytree(item_root, item_out)'))
+  assert.ok(builder.includes('minecraft-item-textures'))
 })
