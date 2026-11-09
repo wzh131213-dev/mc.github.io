@@ -72,7 +72,7 @@ function categoryOf(item: CatalogItem): Category {
 }
 
 function itemName(item: CatalogItem) {
-  return MINECRAFT_ZH_CN[item.name] || CN_NAMES[item.name] || item.label
+  return (MINECRAFT_ZH_CN as Record<string, string>)[item.name] || CN_NAMES[item.name] || item.label
 }
 
 function itemGlyph(name: string) {
