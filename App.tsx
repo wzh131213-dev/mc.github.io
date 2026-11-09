@@ -436,11 +436,12 @@ export default function App() {
           selected={slot}
           hotbar={hotbarBlocks}
           onSelect={(i) => { engineRef.current?.selectSlot(i); setSlot(i) }}
-          onEquip={(id) => {
+          onEquip={(id, targetSlot) => {
+            const target = targetSlot ?? slot
             setHotbarBlocks((current) => {
               const next = [...current]
-              next[slot] = id
-              if (engineRef.current) engineRef.current.hotbar[slot] = id
+              next[target] = id
+              if (engineRef.current) engineRef.current.hotbar[target] = id
               return next
             })
           }}
