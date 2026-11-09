@@ -117,7 +117,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
       <section className="inventory-panel w-[min(900px,98vw)] border-4 border-[#242424] bg-[#c6c6c6] p-3 text-[#202020] shadow-[0_8px_32px_#0009]" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
         <header className="mb-3 flex items-center justify-between gap-2">
           <div>
-            <h2 id="inventory-title" className="font-bold text-lg">创造模式物品栏</h2>
+            <h2 id="inventory-title" className="font-bold text-lg">物品栏 · 完整物品目录</h2>
             <div className="text-[11px] text-[#555]">Minecraft Java 26.3 · {MINECRAFT_REGISTRY.itemCount} 种物品 · {MINECRAFT_REGISTRY.blockCount} 种方块</div>
           </div>
           <button className="min-h-10 border-2 border-[#333] bg-[#8b8b8b] px-3 py-1 text-white" onClick={onClose}>关闭 ×</button>
@@ -172,7 +172,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
 
         <div className="mt-3 mb-1 flex items-center justify-between">
           <strong className="text-sm">玩家背包 · 27 格</strong>
-          <span className="text-[11px] text-[#555]">点击格子可移除该组物品</span>
+          <span className="text-[11px] text-[#555]">点击方块可快捷装备；点击其他物品可移除整组</span>
         </div>
         <div className="grid grid-cols-9 gap-1">
           {bag.map((stack, i) => {
@@ -202,7 +202,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
             </button>
           ))}
         </div>
-        <p className="mt-3 text-center text-[11px] text-[#444]">点击物品获取一组 · 方块可放入快捷栏 · 按 E 打开/关闭 · Esc 关闭</p>
+        <p className="mt-3 text-center text-[11px] text-[#444]">点击物品获取一组 · 方块可放入快捷栏 · 非方块物品目前作为背包道具收录 · 按 E 打开/关闭 · Esc 关闭</p>
       </section>
     </div>
   )
