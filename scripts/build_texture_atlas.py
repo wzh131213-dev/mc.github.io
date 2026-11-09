@@ -102,7 +102,7 @@ def load_vanilla_model_resolver():
         except (KeyError, json.JSONDecodeError):
             model_cache[key] = {}
             return {}
-        inherited = model_textures(model.get("parent"), stack + (key,))
+        inherited = dict(model_textures(model.get("parent"), stack + (key,)))
         inherited.update(model.get("textures", {}))
         model_cache[key] = inherited
         return inherited
