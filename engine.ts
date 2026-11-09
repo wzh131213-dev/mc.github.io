@@ -155,6 +155,7 @@ export class Engine {
     this.sunLight.shadow.bias = -0.00025
     this.sunLight.shadow.normalBias = 0.035
     this.sunLight.shadow.radius = this.touchMode ? 2 : 3
+    this.sunLight.shadow.camera.updateProjectionMatrix()
     this.sunLight.target.position.set(0, 0, 0)
     this.scene.add(this.sunLight, this.sunLight.target)
 
