@@ -35,7 +35,7 @@ for (const block of MINECRAFT_REGISTRY.blocks) {
 }
 export const BLOCKS: number[] = [...new Set([...Object.values(LEGACY_BLOCK_IDS), ...MINECRAFT_REGISTRY.blocks.map((b) => BLOCK_ID_BY_NAME[b.name])])]
 export const BLOCK_ID_SET = new Set<number>(BLOCKS)
-export const BLOCK_LABELS = new Map<number, string>(MINECRAFT_REGISTRY.blocks.map((b): [number, string] => [BLOCK_ID_BY_NAME[b.name], b.displayName]))
+export const BLOCK_LABELS = new Map<number, string>(MINECRAFT_REGISTRY.blocks.map((b): [number, string] => [BLOCK_ID_BY_NAME[b.name], b.label]))
 export const HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, SAND, GLASS, LEAVES]
 
 const TILE = 16
@@ -91,9 +91,9 @@ const TRANSPARENT = new Uint8Array(8192)
 ;[GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE, GLASS].forEach((b) => { OCC[b] = 1; SOLID[b] = 1 })
 for (const block of MINECRAFT_REGISTRY.blocks) {
   const id = BLOCK_ID_BY_NAME[block.name]
-  if (block.boundingBox === 'block') SOLID[id] = 1
+  if (block.box === 'block') SOLID[id] = 1
   if (block.transparent) TRANSPARENT[id] = 1
-  if (block.boundingBox === 'block' && !block.transparent) OCC[id] = 1
+  if (block.box === 'block' && !block.transparent) OCC[id] = 1
 }
 
 export function mulberry32(a: number) {
