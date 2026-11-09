@@ -26,7 +26,7 @@ const UNLOAD_DELAY = 2
 /** 内存里最多保留多少个区块的方块数据(被玩家改过的区块不会被回收) */
 const MAX_DATA_CHUNKS = 1400
 
-const FOG_COLOR = 0xc0d8ff
+const FOG_COLOR = 0xcbd8df
 const PLAYER_W = 0.6
 const PLAYER_H = 1.8
 const EYE = 1.62
@@ -59,8 +59,10 @@ export class Engine {
   private wantTotal = 0
   private wantLoaded = 0
   private trimTimer = 0
-  private opaqueMat: THREE.MeshBasicMaterial
-  private waterMat: THREE.MeshBasicMaterial
+  private opaqueMat: THREE.MeshStandardMaterial
+  private waterMat: THREE.MeshStandardMaterial
+  private sunLight: THREE.DirectionalLight
+  private hemiLight: THREE.HemisphereLight
   private sky: THREE.Mesh
   private sun: THREE.Group
   private clouds: THREE.Mesh
@@ -104,8 +106,13 @@ export class Engine {
 
     this.touchMode = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.touchMode })
-    // 手机屏幕像素密度很高,限制渲染分辨率以保证帧率
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.touchMode ? 1.5 : 2))
+    // 移动端采用较低阴影贴图和像素比,避免高分辨率设备过度消耗 GPU
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.touchMode ? 1.35 : 1.75))
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.12
+    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.camera = new THREE.PerspectiveCamera(85, 1, 0.05, 1500)
     this.camera.rotation.order = 'YXZ'
 
@@ -114,15 +121,43 @@ export class Engine {
     this.scene.background = new THREE.Color(FOG_COLOR)
 
     const tex = getAtlasTexture()
-    this.opaqueMat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5 })
-    this.waterMat = new THREE.MeshBasicMaterial({
+    // 标准材质让区块真正响应半球环境光与方向光,保留像素贴图和顶点 AO
+    this.opaqueMat = new THREE.MeshStandardMaterial({
+      map: tex,
+      vertexColors: true,
+      alphaTest: 0.5,
+      roughness: 0.94,
+      metalness: 0,
+    })
+    this.waterMat = new THREE.MeshStandardMaterial({
       map: tex,
       vertexColors: true,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.68,
+      roughness: 0.28,
+      metalness: 0,
       depthWrite: false,
       side: THREE.DoubleSide,
     })
+
+    // 柔和天空填充光 + 带 PCF 软阴影的太阳方向光
+    this.hemiLight = new THREE.HemisphereLight(0xe8f1f2, 0x77766e, 1.45)
+    this.scene.add(this.hemiLight)
+    this.sunLight = new THREE.DirectionalLight(0xfff1d7, 2.15)
+    this.sunLight.castShadow = true
+    this.sunLight.shadow.mapSize.set(this.touchMode ? 512 : 1024, this.touchMode ? 512 : 1024)
+    this.sunLight.shadow.camera.left = -42
+    this.sunLight.shadow.camera.right = 42
+    this.sunLight.shadow.camera.top = 42
+    this.sunLight.shadow.camera.bottom = -42
+    this.sunLight.shadow.camera.near = 0.5
+    this.sunLight.shadow.camera.far = 240
+    this.sunLight.shadow.bias = -0.00025
+    this.sunLight.shadow.normalBias = 0.035
+    this.sunLight.shadow.radius = this.touchMode ? 2 : 3
+    this.sunLight.shadow.camera.updateProjectionMatrix()
+    this.sunLight.target.position.set(0, 0, 0)
+    this.scene.add(this.sunLight, this.sunLight.target)
 
     // sky dome
     const skyGeo = new THREE.SphereGeometry(600, 24, 16)
@@ -416,11 +451,15 @@ export class Engine {
     const entry: ChunkMesh = { seen: this.time }
     if (opaque) {
       entry.opaque = new THREE.Mesh(opaque, this.opaqueMat)
+      entry.opaque.castShadow = true
+      entry.opaque.receiveShadow = true
       this.scene.add(entry.opaque)
     }
     if (water) {
       entry.water = new THREE.Mesh(water, this.waterMat)
       entry.water.renderOrder = 1
+      entry.water.castShadow = false
+      entry.water.receiveShadow = false
       this.scene.add(entry.water)
     }
     this.chunks.set(key, entry)
@@ -830,6 +869,10 @@ export class Engine {
     this.sun.lookAt(cp)
     this.clouds.position.set(cp.x, 74, cp.z)
     this.cloudTex.offset.set(cp.x / 768 + this.time * 0.0016, -cp.z / 768)
+    // 阴影相机跟随玩家水平移动,保持附近地形的阴影覆盖稳定
+    this.sunLight.position.set(cp.x + 58, 118, cp.z - 42)
+    this.sunLight.target.position.set(cp.x, 0, cp.z)
+    this.sunLight.target.updateMatrixWorld()
     this.renderer.render(this.scene, this.camera)
   }
 }
