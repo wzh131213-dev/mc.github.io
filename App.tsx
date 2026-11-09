@@ -587,6 +587,29 @@ export default function App() {
             })
           }}
           onRemove={(index) => setBagSlots((current) => current.map((stack, i) => i === index ? null : stack))}
+          onMove={(from, to) => setBagSlots((current) => {
+            const next = [...current]
+            const source = next[from]
+            if (!source || from === to) return current
+            const target = next[to]
+            if (!target) {
+              next[to] = source
+              next[from] = null
+              return next
+            }
+            if (target.itemId === source.itemId) {
+              const item = MINECRAFT_REGISTRY.items.find((entry) => entry.id === source.itemId)
+              const limit = Math.min(64, Math.max(1, item?.stack ?? 64))
+              const moved = Math.min(limit - target.count, source.count)
+              if (moved <= 0) return current
+              next[to] = { itemId: target.itemId, count: target.count + moved }
+              next[from] = source.count > moved ? { itemId: source.itemId, count: source.count - moved } : null
+              return next
+            }
+            next[from] = target
+            next[to] = source
+            return next
+          })}
           onClose={closeInventory}
         />
       )}
