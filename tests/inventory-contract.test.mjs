@@ -124,7 +124,7 @@ test('all 26.3 placeable block registry entries have stable internal IDs and 16-
 test('creative inventory browses the full item catalog with search and category filters', async () => {
   const inventory = await read('Inventory.tsx')
   assert.match(inventory, /MINECRAFT_REGISTRY\.items/)
-  assert.match(inventory, /placeholder="搜索物品名称/)
+  assert.match(inventory, /placeholder="搜索物品中文名称/)
   assert.match(inventory, /category/)
   assert.match(inventory, /全部/)
   assert.match(inventory, /1657|itemCount/)
