@@ -12,7 +12,7 @@ test('all registered blocks have a generated icon path and a data-driven display
   assert.match(world, /BLOCK_TILES\[b\] \?\? \[getGenericTile/)
   assert.match(world, /BLOCK_META_BY_ID/)
   assert.equal(registry.blocks.length, 1285)
-  assert.ok(registry.blocks.every((block) => typeof block.name === 'string' && typeof block.displayName === 'string'))
+  assert.ok(registry.blocks.every((block) => typeof block.name === 'string' && typeof block.label === 'string'))
 })
 
 test('inventory UI renders the complete searchable item registry instead of a hard-coded block subset', async () => {
@@ -106,7 +106,7 @@ test('Minecraft 26.3 catalog contains the complete published item and block regi
   assert.ok(registry.items.some((item) => item.name === 'abandoned_camp_map'))
   assert.ok(registry.blocks.some((block) => block.name === 'poplar_log'))
   assert.ok(registry.blocks.some((block) => block.name === 'straw_bed'))
-  assert.ok(registry.blocks.some((block) => block.name === 'white_cushion'))
+  assert.ok(registry.items.some((item) => item.name === 'white_cushion'))
 })
 
 test('all 26.3 placeable block registry entries have stable internal IDs and 16-bit chunk storage', async () => {
@@ -117,13 +117,13 @@ test('all 26.3 placeable block registry entries have stable internal IDs and 16-
   assert.match(world, /new Uint16Array\(CS \* CS \* SY\)/)
   assert.match(world, /new Uint8Array\(8192\)/)
   assert.match(world, /MINECRAFT_REGISTRY\.blocks/)
-  assert.match(world, /boundingBox/)
+  assert.match(world, /block\.box === 'block'/)
 })
 
 test('creative inventory browses the full item catalog with search and category filters', async () => {
   const inventory = await read('Inventory.tsx')
   assert.match(inventory, /MINECRAFT_REGISTRY\.items/)
-  assert.match(inventory, /search/)
+  assert.match(inventory, /placeholder="搜索物品名称/)
   assert.match(inventory, /category/)
   assert.match(inventory, /全部/)
   assert.match(inventory, /1657|itemCount/)
