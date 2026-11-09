@@ -259,6 +259,11 @@ export class Engine {
 
   /* ---------------------------- public API --------------------------- */
 
+  /** 将已修改区块的存档写入浏览器本地存储。 */
+  saveWorld() {
+    return this.world.save()
+  }
+
   setSettings(s: Settings) {
     this.settings = s
     this.applyFog()
