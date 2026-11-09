@@ -1,9 +1,11 @@
 import * as THREE from 'three'
+import MINECRAFT_REGISTRY from './minecraft-26.3-registry.json'
 
 export const SY = 64 // 世界高度(水平方向无限)
 export const CS = 16 // 区块边长
 export const SEA = 22
 
+// 保留旧版 1–10 方块 ID，确保既有世界存档不会因升级而错位。
 export const AIR = 0
 export const GRASS = 1
 export const DIRT = 2
@@ -16,7 +18,24 @@ export const PLANKS = 8
 export const COBBLE = 9
 export const GLASS = 10
 
-export const BLOCKS = [GRASS, DIRT, STONE, SAND, WATER, LOG, LEAVES, PLANKS, COBBLE, GLASS] as const
+const LEGACY_BLOCK_IDS: Record<string, number> = {
+  grass_block: GRASS, dirt: DIRT, stone: STONE, sand: SAND, water: WATER,
+  oak_log: LOG, oak_leaves: LEAVES, oak_planks: PLANKS, cobblestone: COBBLE, glass: GLASS,
+}
+export const EXTRA_BLOCK_ID_BASE = 4096
+export const BLOCK_ID_BY_NAME: Record<string, number> = Object.create(null)
+export const BLOCK_META_BY_ID = new Map<number, (typeof MINECRAFT_REGISTRY.blocks)[number]>()
+export const BLOCK_META_BY_NAME = new Map<string, (typeof MINECRAFT_REGISTRY.blocks)[number]>()
+
+for (const block of MINECRAFT_REGISTRY.blocks) {
+  const id = LEGACY_BLOCK_IDS[block.name] ?? EXTRA_BLOCK_ID_BASE + block.id
+  BLOCK_ID_BY_NAME[block.name] = id
+  BLOCK_META_BY_ID.set(id, block)
+  BLOCK_META_BY_NAME.set(block.name, block)
+}
+export const BLOCKS: number[] = [...new Set([...Object.values(LEGACY_BLOCK_IDS), ...MINECRAFT_REGISTRY.blocks.map((b) => BLOCK_ID_BY_NAME[b.name])])]
+export const BLOCK_ID_SET = new Set<number>(BLOCKS)
+export const BLOCK_LABELS = new Map<number, string>(MINECRAFT_REGISTRY.blocks.map((b) => [BLOCK_ID_BY_NAME[b.name], b.displayName]))
 export const HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, SAND, GLASS, LEAVES]
 
 const TILE = 16
@@ -36,9 +55,44 @@ const BLOCK_TILES: Record<number, [number, number, number]> = {
   [GLASS]: [11, 11, 11],
 }
 
-// blocks that hide neighbouring faces
-const OCC = new Uint8Array(256)
-;[GRASS, DIRT, STONE, SAND, LOG, PLANKS, COBBLE].forEach((b) => (OCC[b] = 1))
+function getGenericTile(blockId: number) {
+  const meta = BLOCK_META_BY_ID.get(blockId)
+  if (!meta) return 12
+  const name = meta.name
+  if (/leaves|sapling|flower|grass|fern|moss|vine|shrub|mushroom|petal/.test(name)) return 14
+  if (/log|wood|planks|sign|boat|bamboo|shelf|fence|door|trapdoor/.test(name)) return 13
+  if (/dirt|sand|gravel|mud|clay|soil|root|powder/.test(name)) return 12
+  return 15
+}
+
+function getBlockTint(blockId: number): [number, number, number] {
+  const meta = BLOCK_META_BY_ID.get(blockId)
+  if (!meta) return [1, 1, 1]
+  const name = meta.name
+  const colors: Record<string, [number, number, number]> = {
+    white: [1, 1, 1], orange: [1, 0.55, 0.2], magenta: [0.85, 0.35, 0.85],
+    light_blue: [0.35, 0.7, 1], yellow: [1, 0.9, 0.25], lime: [0.55, 1, 0.2],
+    pink: [1, 0.55, 0.7], gray: [0.55, 0.55, 0.55], light_gray: [0.8, 0.8, 0.8],
+    cyan: [0.25, 0.8, 0.8], purple: [0.6, 0.3, 0.8], blue: [0.25, 0.35, 1],
+    brown: [0.55, 0.35, 0.2], green: [0.3, 0.7, 0.25], red: [1, 0.25, 0.2], black: [0.22, 0.22, 0.22],
+  }
+  const prefix = name.split('_')[0]
+  if (colors[prefix] && /wool|concrete|terracotta|cushion|stained_glass|carpet|banner|bed/.test(name)) return colors[prefix]
+  if (/leaves|sapling|flower|grass|fern|moss|vine|shrub|mushroom/.test(name)) return [0.72, 1, 0.72]
+  if (/log|wood|planks|sign|boat|bamboo|shelf|fence|door|trapdoor/.test(name)) return [1, 0.84, 0.62]
+  if (/water|ice|snow|prismarine|diamond|lapis|copper/.test(name)) return [0.72, 0.9, 1]
+  return [0.92, 0.92, 0.92]
+}
+
+// Blocks with full collision and blocks that occlude neighbouring faces.
+const OCC = new Uint8Array(8192)
+const SOLID = new Uint8Array(8192)
+;[GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE, GLASS].forEach((b) => { OCC[b] = 1; SOLID[b] = 1 })
+for (const block of MINECRAFT_REGISTRY.blocks) {
+  const id = BLOCK_ID_BY_NAME[block.name]
+  if (block.boundingBox === 'block') SOLID[id] = 1
+  if (block.boundingBox === 'block' && !block.transparent) OCC[id] = 1
+}
 
 export function mulberry32(a: number) {
   return () => {
@@ -214,6 +268,11 @@ export function getAtlas() {
       return [226, 237, 235, 255]
     return [0, 0, 0, 0]
   })
+  // Generic procedural tiles used as visual fallbacks for the full 26.3 block registry.
+  put(12, (x, y) => { const d = v(13); const grain = (x * 3 + y * 5) % 7 === 0 ? -18 : 0; return [132 + d + grain, 126 + d + grain, 119 + d + grain, 255] })
+  put(13, (x, y) => { const d = v(8) + (x % 4 === 0 ? -12 : 0); return [151 + d, 111 + d * 0.7, 72 + d * 0.5, 255] })
+  put(14, (x, y) => { const r = rnd(); if (r < 0.08) return [0, 0, 0, 0]; const d = v(18); return [70 + d * 0.45, 126 + d, 58 + d * 0.35, 255] })
+  put(15, (x, y) => { const d = v(12); const seam = (x % 8 === 0 || y % 8 === 0) ? -14 : 0; return [142 + d + seam, 145 + d + seam, 151 + d + seam, 255] })
 
   atlasCanvas = c
   return c
@@ -241,7 +300,7 @@ export function blockIcon(b: number) {
   c.height = 48
   const ctx = c.getContext('2d')!
   ctx.imageSmoothingEnabled = false
-  const [top, , side] = BLOCK_TILES[b] ?? BLOCK_TILES[STONE]
+  const [top, , side] = BLOCK_TILES[b] ?? [getGenericTile(b), getGenericTile(b), getGenericTile(b)]
   const draw = (tile: number, m: [number, number, number, number, number, number], shade: number) => {
     ctx.save()
     ctx.setTransform(...m)
@@ -255,6 +314,13 @@ export function blockIcon(b: number) {
   draw(top, [1.25, 0.625, -1.25, 0.625, 24, 4], 0)
   draw(side, [1.25, 0.625, 0, 1.25, 4, 14], 0.28)
   draw(side, [1.25, -0.625, 0, 1.25, 24, 24], 0.5)
+  if (b > GLASS) {
+    const [r, g, blue] = getBlockTint(b)
+    ctx.globalCompositeOperation = 'multiply'
+    ctx.fillStyle = `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(blue * 255)})`
+    ctx.fillRect(0, 0, c.width, c.height)
+    ctx.globalCompositeOperation = 'source-over'
+  }
   const url = c.toDataURL()
   iconCache.set(b, url)
   return url
@@ -317,7 +383,7 @@ function hash3(x: number, y: number, z: number, seed: number) {
 }
 
 export class Chunk {
-  data = new Uint8Array(CS * CS * SY)
+  data = new Uint16Array(CS * CS * SY)
   /** 本区块内最高的非空气方块高度,网格化时只扫到这一层 */
   maxY = 0
   /** 本区块被玩家修改过的体素索引及最终方块 ID,用于本机存档 */
@@ -372,7 +438,7 @@ export class World {
         if (!Array.isArray(edit) || edit.length !== 2) continue
         const [index, block] = edit
         if (!Number.isInteger(index) || index < 0 || index >= chunk.data.length) continue
-        if (!Number.isInteger(block) || (block !== AIR && !BLOCKS.includes(block as (typeof BLOCKS)[number]))) continue
+        if (!Number.isInteger(block) || (block !== AIR && !BLOCK_ID_SET.has(block))) continue
         chunk.data[index] = block
         chunk.overrides.set(index, block)
         if (block !== AIR) maxY = Math.max(maxY, Math.floor(index / (CS * CS)))
@@ -526,7 +592,7 @@ export class World {
 
   set(x: number, y: number, z: number, b: number) {
     if (y < 0 || y >= SY) return
-    if (!Number.isInteger(b) || (b !== AIR && !BLOCKS.includes(b as (typeof BLOCKS)[number]))) return
+    if (!Number.isInteger(b) || (b !== AIR && !BLOCK_ID_SET.has(b))) return
     const c = this.getChunk(x >> 4, z >> 4)
     const index = (y * CS + (z & 15)) * CS + (x & 15)
     c.data[index] = b
@@ -540,7 +606,7 @@ export class World {
     if (y < 0) return true
     if (y >= SY) return false
     const b = this.get(x, y, z)
-    return b !== AIR && b !== WATER
+    return SOLID[b] === 1
   }
 
   /* ------------------------------ 出生点 / 全景 ------------------------------ */
@@ -631,8 +697,7 @@ export class World {
           if (!b) continue
           const isWater = b === WATER
           const md = isWater ? w : o
-          const tiles = BLOCK_TILES[b]
-          if (!tiles) continue
+          const tiles = BLOCK_TILES[b] ?? [getGenericTile(b), getGenericTile(b), getGenericTile(b)]
           for (const f of FACES) {
             const nb = this.get(x + f.n[0], y + f.n[1], z + f.n[2])
             if (isWater) {
@@ -660,7 +725,8 @@ export class World {
                 aoV[i] = a
                 br *= AO_B[a]
               }
-              md.col.push(br, br, br)
+              const tint = getBlockTint(b)
+              md.col.push(br * tint[0], br * tint[1], br * tint[2])
             }
             if (useAO && aoV[0] + aoV[2] < aoV[1] + aoV[3]) {
               md.idx.push(base + 1, base + 2, base + 3, base + 1, base + 3, base)
