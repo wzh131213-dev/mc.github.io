@@ -22,6 +22,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Verify GitHub Pages uses the Actions source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pages_source="$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type')"
+          if [ "$pages_source" != "workflow" ]; then
+            echo "::error title=GitHub Pages source mismatch::Set Settings > Pages > Build and deployment > Source to GitHub Actions. Branch/Jekyll publishing sends uncompiled main.tsx to the browser."
+            exit 1
+          fi
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
