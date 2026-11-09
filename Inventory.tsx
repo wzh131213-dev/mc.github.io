@@ -121,7 +121,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
         <header className="mb-3 flex items-center justify-between gap-2">
           <div>
             <h2 id="inventory-title" className="font-bold text-lg">物品栏 · 完整物品目录</h2>
-            <div className="text-[11px] text-[#555]">Minecraft Java 26.3 · {MINECRAFT_REGISTRY.itemCount} 种物品 · {MINECRAFT_REGISTRY.blockCount} 种方块</div>
+            <div className="text-[11px] text-[#555]">我的世界 Java 版 26.3 · {MINECRAFT_REGISTRY.itemCount} 种物品 · {MINECRAFT_REGISTRY.blockCount} 种方块</div>
           </div>
           <button className="min-h-10 border-2 border-[#333] bg-[#8b8b8b] px-3 py-1 text-white" onClick={onClose}>关闭 ×</button>
         </header>
