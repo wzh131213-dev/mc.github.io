@@ -1,4 +1,4 @@
-import { BLOCKS, HOTBAR, blockIcon } from './world'
+import { BLOCKS, blockIcon } from './world'
 
 type Props = {
   selected: number
