@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import urllib.parse
 import urllib.request
 import zipfile
@@ -13,6 +14,7 @@ from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = json.loads((ROOT / "minecraft-26.3-registry.json").read_text(encoding="utf-8"))
 OUT = ROOT / "public" / "vanilla-block-atlas.png"
+CREDITS_OUT = ROOT / "public" / "TEXTURE_CREDITS.md"
 TILE = 16
 GRID = 64
 HEADERS = {"User-Agent": "mc.github.io texture-atlas-builder/1.0 (CC-BY-SA-4.0 attribution)"}
@@ -126,6 +128,7 @@ def main():
             atlas.paste(image, ((tile % GRID) * TILE, (tile // GRID) * TILE), image)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     atlas.save(OUT, optimize=True)
+    shutil.copyfile(ROOT / "TEXTURE_CREDITS.md", CREDITS_OUT)
     print(f"Fresh Textures {version} (CC BY-SA 4.0): {len(textures)} source textures")
     print(f"Mapped {matched}/{len(REGISTRY['blocks']) * 3} block faces; unique fallback faces generated for missing names")
     print(f"Atlas: {OUT} ({atlas.width}x{atlas.height})")
