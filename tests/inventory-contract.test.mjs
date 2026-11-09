@@ -198,8 +198,11 @@ test('every registered block gets a distinct three-face atlas tile in a 64 by 64
   assert.ok(world.includes('onAtlasReady'))
 })
 
-test('deployment builds the licensed 26.3 texture atlas before Vite packaging', async () => {
+test('deployment fetches InventivetalentDev vanilla 26.3 textures and builds both block and item assets', async () => {
   const workflow = await read('.github/workflows/deploy.yml')
+  assert.ok(workflow.includes('InventivetalentDev/minecraft-assets.git'))
+  assert.ok(workflow.includes('assets/minecraft/textures'))
+  assert.ok(workflow.includes('minecraft-item-textures'))
   assert.ok(workflow.includes('scripts/build_texture_atlas.py'))
   assert.ok(workflow.includes('pip install --disable-pip-version-check pillow'))
   assert.ok(workflow.includes('Build Vite application'))
@@ -213,4 +216,13 @@ test('core texture atlas fallbacks preserve recognizable block colors and PNG al
   assert.match(builder, /atlas\.paste\(image, \(\(index % GRID\) \* TILE, \(index \/\/ GRID\) \* TILE\)\)/)
   assert.doesNotMatch(builder, /atlas\.paste\(image, \(\(index % GRID\) \* TILE, \(index \/\/ GRID\) \* TILE\), image\)/)
   assert.doesNotMatch(builder, /atlas\.paste\(image, \(\(tile % GRID\) \* TILE, \(tile \/\/ GRID\) \* TILE\), image\)/)
+})
+
+test('inventory uses vanilla item PNGs instead of emoji or generated color placeholders', async () => {
+  const inventory = await read('Inventory.tsx')
+  assert.ok(inventory.includes('minecraft-item-textures/'))
+  assert.ok(inventory.includes('<ItemTexture name={item.name}'))
+  assert.ok(inventory.includes('onError={() => setFailed(true)}'))
+  const builder = await read('scripts/build_texture_atlas.py')
+  assert.ok(builder.includes('shutil.copytree(item_root, item_out)'))
 })
