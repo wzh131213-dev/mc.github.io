@@ -259,3 +259,13 @@ test('inventory click no longer removes a stack as an accidental side effect', a
   const bagSection = inventory.slice(inventory.indexOf('玩家背包'), inventory.indexOf('快捷栏 ·'))
   assert.doesNotMatch(bagSection, /else if \(stack\) onRemove\(i\)/)
 })
+
+
+test('animated vanilla item textures use a valid static inventory frame instead of nonexistent base PNGs', async () => {
+  const inventory = await read('Inventory.tsx')
+  assert.match(inventory, /function itemTextureName\(name: string\)/)
+  assert.match(inventory, /compass: 'compass_00'/)
+  assert.match(inventory, /clock: 'clock_00'/)
+  assert.match(inventory, /crossbow: 'crossbow_standby'/)
+  assert.match(inventory, /itemTextureName\(name\)/)
+})
