@@ -99,6 +99,22 @@ function itemColor(name: string) {
   return `hsl(${hue} 38% 42%)`
 }
 
+const ITEM_TEXTURE_BASE = `${import.meta.env.BASE_URL}minecraft-item-textures/`
+
+function ItemTexture({ name, className = 'h-8 w-8' }: { name: string; className?: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) {
+    return <span className={`flex ${className} items-center justify-center text-[17px] font-bold`} aria-hidden="true">{itemGlyph(name)}</span>
+  }
+  return <img
+    src={`${ITEM_TEXTURE_BASE}${encodeURIComponent(name)}.png`}
+    alt=""
+    className={`${className} object-contain`}
+    style={{ imageRendering: 'pixelated' }}
+    onError={() => setFailed(true)}
+  />
+}
+
 export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, onGive, onRemove, onClose }: Props) {
   const [category, setCategory] = useState<Category>('全部')
   const [query, setQuery] = useState('')
@@ -151,7 +167,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
                 {blockId !== undefined ? (
                   <img src={blockIcon(blockId)} alt="" className="h-8 w-8 object-contain" style={{ imageRendering: 'pixelated' }} />
                 ) : (
-                  <span className="flex h-8 w-8 items-center justify-center border border-black/40 text-[17px] font-bold text-white shadow-inner" style={{ background: itemColor(item.name), textShadow: '1px 1px 1px #000' }}>{itemGlyph(item.name)}</span>
+                  <ItemTexture name={item.name} />
                 )}
                 <span className="w-full truncate text-center text-[10px] leading-tight text-[#171717]">{itemName(item)}</span>
               </button>
@@ -188,7 +204,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
                 className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444]">
                 {stack && item && (blockId !== undefined
                   ? <img src={blockIcon(blockId)} alt="" className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
-                  : <span className="flex h-full w-full items-center justify-center text-lg">{itemGlyph(item.name)}</span>)}
+                  : <ItemTexture name={item.name} className="h-full w-full" />)}
                 {stack && <span className="absolute right-0 bottom-0 rounded-sm bg-black/75 px-1 text-[10px] font-bold text-white">{stack.count}</span>}
               </button>
             )
