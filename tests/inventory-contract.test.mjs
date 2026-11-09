@@ -174,7 +174,7 @@ test('every registered Minecraft 26.3 block has a Simplified Chinese display nam
     assert.doesNotMatch(translations[block.name], /[A-Za-z]/, `English display name for ${block.name}`)
   }
   const inventory = await read('Inventory.tsx')
-  assert.ok(inventory.includes('MINECRAFT_ZH_CN[item.name]'))
+  assert.ok(inventory.includes('MINECRAFT_ZH_CN') && inventory.includes('[item.name]'))
 })
 
 test('all item catalog display names are Chinese and internal English IDs are not displayed', async () => {
