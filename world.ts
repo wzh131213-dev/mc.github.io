@@ -26,12 +26,14 @@ export const EXTRA_BLOCK_ID_BASE = 4096
 export const BLOCK_ID_BY_NAME: Record<string, number> = Object.create(null)
 export const BLOCK_META_BY_ID = new Map<number, (typeof MINECRAFT_REGISTRY.blocks)[number]>()
 export const BLOCK_META_BY_NAME = new Map<string, (typeof MINECRAFT_REGISTRY.blocks)[number]>()
+const BLOCK_TEXTURE_INDEX_BY_ID = new Map<number, number>()
 
-for (const block of MINECRAFT_REGISTRY.blocks) {
+for (const [blockIndex, block] of MINECRAFT_REGISTRY.blocks.entries()) {
   const id = LEGACY_BLOCK_IDS[block.name] ?? EXTRA_BLOCK_ID_BASE + block.id
   BLOCK_ID_BY_NAME[block.name] = id
   BLOCK_META_BY_ID.set(id, block)
   BLOCK_META_BY_NAME.set(block.name, block)
+  BLOCK_TEXTURE_INDEX_BY_ID.set(id, blockIndex)
 }
 export const BLOCKS: number[] = [...new Set([...Object.values(LEGACY_BLOCK_IDS), ...MINECRAFT_REGISTRY.blocks.map((b) => BLOCK_ID_BY_NAME[b.name])])]
 export const BLOCK_ID_SET = new Set<number>(BLOCKS)
@@ -39,7 +41,7 @@ export const BLOCK_LABELS = new Map<number, string>(MINECRAFT_REGISTRY.blocks.ma
 export const HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, SAND, GLASS, LEAVES]
 
 const TILE = 16
-const TILE_COUNT = 16
+const TILE_COUNT = 64
 
 // [top, bottom, side]
 const BLOCK_TILES: Record<number, [number, number, number]> = {
@@ -63,6 +65,15 @@ function getGenericTile(blockId: number) {
   if (/log|wood|planks|sign|boat|bamboo|shelf|fence|door|trapdoor/.test(name)) return 13
   if (/dirt|sand|gravel|mud|clay|soil|root|powder/.test(name)) return 12
   return 15
+}
+
+function getBlockTiles(blockId: number): [number, number, number] {
+  const legacy = BLOCK_TILES[blockId]
+  if (legacy) return legacy
+  const index = BLOCK_TEXTURE_INDEX_BY_ID.get(blockId)
+  if (index === undefined) return [15, 15, 15]
+  const base = 12 + index * 3
+  return [base, base + 1, base + 2]
 }
 
 function getBlockTint(blockId: number): [number, number, number] {
@@ -152,7 +163,7 @@ export function getAtlas() {
   if (atlasCanvas) return atlasCanvas
   const c = document.createElement('canvas')
   c.width = TILE * TILE_COUNT
-  c.height = TILE
+  c.height = TILE * TILE_COUNT
   const ctx = c.getContext('2d')!
   const rnd = mulberry32(1234)
   const v = (amt: number) => (rnd() - 0.5) * 2 * amt
@@ -169,7 +180,7 @@ export function getAtlas() {
         img.data[i + 3] = a
       }
     }
-    ctx.putImageData(img, tile * TILE, 0)
+    ctx.putImageData(img, (tile % TILE_COUNT) * TILE, Math.floor(tile / TILE_COUNT) * TILE)
   }
 
   const grassPx = (): [number, number, number, number] => {
@@ -276,11 +287,66 @@ export function getAtlas() {
   put(14, () => { const r = rnd(); if (r < 0.08) return [0, 0, 0, 0]; const d = v(18); return [70 + d * 0.45, 126 + d, 58 + d * 0.35, 255] })
   put(15, (x, y) => { const d = v(12); const seam = (x % 8 === 0 || y % 8 === 0) ? -14 : 0; return [142 + d + seam, 145 + d + seam, 151 + d + seam, 255] })
 
+  // 每个注册方块都生成独立的备用像素纹理，官方/授权纹理图集加载后会整体替换。
+  for (const [index, block] of MINECRAFT_REGISTRY.blocks.entries()) {
+    const base = 12 + index * 3
+    const tint = getBlockTint(BLOCK_ID_BY_NAME[block.name])
+    let seed = 2166136261
+    for (let i = 0; i < block.name.length; i++) seed = Math.imul(seed ^ block.name.charCodeAt(i), 16777619)
+    const rand = (x: number, y: number, salt: number) => {
+      let h = Math.imul((seed ^ salt ^ (x * 374761393) ^ (y * 668265263)) | 0, 1274126177)
+      h ^= h >>> 16
+      return (h >>> 0) / 4294967295
+    }
+    for (let face = 0; face < 3; face++) {
+      put(base + face, (x, y) => {
+        const grain = (rand(x, y, face * 977) - 0.5) * 38
+        const seam = /planks|bricks|tiles|stairs|slab/.test(block.name) && (x % 8 === 0 || y % 8 === 0) ? -28 : 0
+        const ore = /ore|diamond|emerald|amethyst|quartz|copper/.test(block.name) && rand(x, y, 73) > 0.91 ? 58 : 0
+        const leaf = /leaves|moss|grass|fern|vine|shrub/.test(block.name) && rand(x, y, 51) < 0.12
+        if (leaf) return [0, 0, 0, 0]
+        const shade = face === 1 ? 0.78 : face === 2 ? 0.88 : 1
+        return [
+          Math.max(0, Math.min(255, (tint[0] * 205 + grain + seam + ore) * shade)),
+          Math.max(0, Math.min(255, (tint[1] * 205 + grain + seam + ore) * shade)),
+          Math.max(0, Math.min(255, (tint[2] * 205 + grain + seam + ore) * shade)),
+          255,
+        ]
+      })
+    }
+  }
+
   atlasCanvas = c
+  // 图集由构建工作流从带明确再分发许可的 26.3 资源包生成；本地开发无图集时保留独立备用纹理。
+  if (!atlasLoadStarted) {
+    atlasLoadStarted = true
+    const image = new Image()
+    image.onload = () => {
+      const context = c.getContext('2d')
+      if (!context) return
+      context.clearRect(0, 0, c.width, c.height)
+      context.drawImage(image, 0, 0, c.width, c.height)
+      atlasLoaded = true
+      if (atlasTex) atlasTex.needsUpdate = true
+      iconCache.clear()
+      atlasReadyListeners.forEach((listener) => listener())
+    }
+    image.onerror = () => { atlasLoadStarted = false }
+    image.src = new URL('vanilla-block-atlas.png', document.baseURI).toString()
+  }
   return c
 }
 
 let atlasTex: THREE.CanvasTexture | null = null
+let atlasLoaded = false
+let atlasLoadStarted = false
+const atlasReadyListeners = new Set<() => void>()
+const iconCache = new Map<number, string>()
+export function onAtlasReady(listener: () => void) {
+  atlasReadyListeners.add(listener)
+  if (atlasLoaded) listener()
+  return () => atlasReadyListeners.delete(listener)
+}
 export function getAtlasTexture() {
   if (atlasTex) return atlasTex
   const t = new THREE.CanvasTexture(getAtlas())
@@ -292,7 +358,6 @@ export function getAtlasTexture() {
   return t
 }
 
-const iconCache = new Map<number, string>()
 export function blockIcon(b: number) {
   const hit = iconCache.get(b)
   if (hit) return hit
@@ -302,11 +367,11 @@ export function blockIcon(b: number) {
   c.height = 48
   const ctx = c.getContext('2d')!
   ctx.imageSmoothingEnabled = false
-  const [top, , side] = BLOCK_TILES[b] ?? [getGenericTile(b), getGenericTile(b), getGenericTile(b)]
+  const [top, , side] = getBlockTiles(b)
   const draw = (tile: number, m: [number, number, number, number, number, number], shade: number) => {
     ctx.save()
     ctx.setTransform(...m)
-    ctx.drawImage(atlas, tile * TILE, 0, TILE, TILE, 0, 0, TILE, TILE)
+    ctx.drawImage(atlas, (tile % TILE_COUNT) * TILE, Math.floor(tile / TILE_COUNT) * TILE, TILE, TILE, 0, 0, TILE, TILE)
     if (shade > 0) {
       ctx.fillStyle = `rgba(0,0,0,${shade})`
       ctx.fillRect(0, 0, TILE, TILE)
@@ -316,13 +381,6 @@ export function blockIcon(b: number) {
   draw(top, [1.25, 0.625, -1.25, 0.625, 24, 4], 0)
   draw(side, [1.25, 0.625, 0, 1.25, 4, 14], 0.28)
   draw(side, [1.25, -0.625, 0, 1.25, 24, 24], 0.5)
-  if (b > GLASS) {
-    const [r, g, blue] = getBlockTint(b)
-    ctx.globalCompositeOperation = 'multiply'
-    ctx.fillStyle = `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(blue * 255)})`
-    ctx.fillRect(0, 0, c.width, c.height)
-    ctx.globalCompositeOperation = 'source-over'
-  }
   const url = c.toDataURL()
   iconCache.set(b, url)
   return url
@@ -699,7 +757,7 @@ export class World {
           if (!b) continue
           const isWater = b === WATER
           const md = isWater ? w : o
-          const tiles = BLOCK_TILES[b] ?? [getGenericTile(b), getGenericTile(b), getGenericTile(b)]
+          const tiles = getBlockTiles(b)
           for (const f of FACES) {
             const nb = this.get(x + f.n[0], y + f.n[1], z + f.n[2])
             if (isWater) {
@@ -709,8 +767,12 @@ export class World {
             } else if (OCC[nb]) continue
 
             const tile = tiles[f.ti]
-            const u0 = tile / TILE_COUNT
-            const u1 = (tile + 1) / TILE_COUNT
+            const tileX = tile % TILE_COUNT
+            const tileY = Math.floor(tile / TILE_COUNT)
+            const u0 = tileX / TILE_COUNT
+            const u1 = (tileX + 1) / TILE_COUNT
+            const v0 = 1 - (tileY + 1) / TILE_COUNT
+            const v1 = 1 - tileY / TILE_COUNT
             const base = md.pos.length / 3
             const ax = f.n[0] !== 0 ? 0 : f.n[1] !== 0 ? 1 : 2
             const a1 = (ax + 1) % 3
@@ -720,7 +782,7 @@ export class World {
             for (let i = 0; i < 4; i++) {
               const c = f.c[i]
               md.pos.push(x + c[0], y + (c[1] ? topH : 0), z + c[2])
-              md.uv.push(i === 1 || i === 2 ? u1 : u0, i >= 2 ? 1 : 0)
+              md.uv.push(i === 1 || i === 2 ? u1 : u0, i >= 2 ? v1 : v0)
               let br = f.shade
               if (useAO) {
                 const a = this.ao(x + f.n[0], y + f.n[1], z + f.n[2], a1, a2, c[a1] * 2 - 1, c[a2] * 2 - 1)
