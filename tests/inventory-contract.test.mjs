@@ -70,9 +70,9 @@ test('Pages deployment refuses to publish the uncompiled branch source', async (
   assert.match(workflow, /gh api "repos\/\$\{GITHUB_REPOSITORY\}\/pages" --jq '\.build_type'/)
   assert.match(workflow, /pages_source.*!= "workflow"/)
   assert.match(workflow, /Source to GitHub Actions/)
-  assert.match(workflow, /runs-on: ubuntu-26\\.04/)
-  assert.match(workflow, /actions\\/upload-pages-artifact@v5/)
-  assert.match(workflow, /actions\\/deploy-pages@v5/)
+  assert.ok(workflow.includes('runs-on: ubuntu-26.04'))
+  assert.ok(workflow.includes('uses: actions/upload-pages-artifact@v5'))
+  assert.ok(workflow.includes('uses: actions/deploy-pages@v5'))
 })
 
 test('the production build is configured for the project Pages base path', async () => {
