@@ -837,7 +837,7 @@ export class Engine {
     if (this.infoTimer > 0.2) {
       this.infoTimer = 0
       this.onInfo?.({
-        text: `XYZ: ${this.pos.x.toFixed(2)} / ${this.pos.y.toFixed(2)} / ${this.pos.z.toFixed(2)}${this.fly ? '  [飞行]' : ''}`,
+        text: `坐标：${this.pos.x.toFixed(2)} / ${this.pos.y.toFixed(2)} / ${this.pos.z.toFixed(2)}${this.fly ? '  [飞行]' : ''}`,
         chunkText: `区块: ${this.chunks.size} 已加载 / ${this.world.chunks.size} 已生成 · 渲染距离 ${this.settings.chunks}`,
         underwater: this.underwater,
         fly: this.fly,
