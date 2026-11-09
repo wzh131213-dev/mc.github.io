@@ -5,6 +5,7 @@ import type { InfoPayload, Settings } from './engine'
 import Logo from './Logo'
 import TouchControls from './TouchControls'
 import { HOTBAR, blockIcon, dirtDataURL } from './world'
+import Inventory from './Inventory'
 
 type Screen = 'title' | 'options' | 'multi' | 'loading' | 'playing' | 'paused' | 'quit'
 
@@ -130,6 +131,8 @@ export default function App() {
     chunks: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 6 : 8,
   }))
   const [slot, setSlot] = useState(0)
+  const [hotbarBlocks, setHotbarBlocks] = useState<number[]>([...HOTBAR])
+  const [inventoryOpen, setInventoryOpen] = useState(false)
   const [info, setInfo] = useState<InfoPayload>({ text: '', chunkText: '', underwater: false, fly: false })
   const [touch, setTouch] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -178,7 +181,8 @@ export default function App() {
       if (e.code !== 'Escape') return
       const s = screenRef.current
       const eng = engineRef.current
-      if (s === 'playing') go('paused')
+      if (s === 'playing' && inventoryOpen) { setInventoryOpen(false); eng?.setActive(true) }
+      else if (s === 'playing') go('paused')
       else if (s === 'paused') {
         eng?.lock()
         go('playing')
@@ -187,7 +191,21 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go])
+  }, [go, inventoryOpen])
+
+  useEffect(() => {
+    const onInventoryKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyE' || screenRef.current !== 'playing' || e.repeat) return
+      e.preventDefault()
+      setInventoryOpen((open) => {
+        const next = !open
+        engineRef.current?.setActive(!next)
+        return next
+      })
+    }
+    window.addEventListener('keydown', onInventoryKey)
+    return () => window.removeEventListener('keydown', onInventoryKey)
+  }, [])
 
   // 加载界面:真实等待视野内的区块生成完毕(至少 1 秒,最多 15 秒)
   useEffect(() => {
@@ -394,7 +412,7 @@ export default function App() {
               } as CSSProperties
             }
           >
-            {HOTBAR.map((b, i) => (
+            {hotbarBlocks.map((b, i) => (
               <div
                 key={i}
                 className={`hotbar-slot relative flex h-[var(--slot)] w-[var(--slot)] items-center justify-center bg-[#8b8b8b] ${touch ? 'pointer-events-auto touch-none' : ''}`}
@@ -411,6 +429,23 @@ export default function App() {
             ))}
           </div>
         </div>
+      )}
+
+      {inventoryOpen && screen === 'playing' && (
+        <Inventory
+          selected={slot}
+          hotbar={hotbarBlocks}
+          onSelect={(i) => { engineRef.current?.selectSlot(i); setSlot(i) }}
+          onEquip={(id) => {
+            setHotbarBlocks((current) => {
+              const next = [...current]
+              next[slot] = id
+              if (engineRef.current) engineRef.current.hotbar[slot] = id
+              return next
+            })
+          }}
+          onClose={() => { setInventoryOpen(false); engineRef.current?.setActive(true) }}
+        />
       )}
 
       {/* ---------------------------- TOUCH CONTROLS ---------------------------- */}
