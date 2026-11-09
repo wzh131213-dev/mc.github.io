@@ -232,6 +232,6 @@ test('inventory uses vanilla item PNGs instead of emoji or generated color place
 test('title screen uses ME WORLD branding and displays the requested Minecraft disclaimer', async () => {
   const logo = await read('Logo.tsx')
   const app = await read('App.tsx')
-  assert.ok(logo.includes("const WORD = 'ME WORLD'"))
+  assert.ok(logo.includes("const WORD = 'me world'"))
   assert.ok(app.includes('Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.'))
 })
