@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Engine } from './engine'
 import type { InfoPayload, Settings } from './engine'
 import Logo from './Logo'
@@ -25,9 +26,9 @@ const SPLASHES = [
   '像素风永不过时!',
 ]
 
-const TIPS = 'WASD 移动 · 空格 跳跃(双击飞行) · Shift 疾跑 · 左键 破坏 · 右键 放置 · 1-9 / 滚轮 切换方块 · Esc 菜单'
+const TIPS = 'WASD 移动 · 空格 跳跃(双击飞行) · Shift 疾跑 · 左键 破坏 · 右键 放置 · 1-9 / 滚轮 切换方块 · E 背包 · Esc 菜单'
 const TIPS_TOUCH =
-  '左下十字键 移动(连点两下 ↑ 疾跑) · 屏幕上滑动 转视角 · 轻点 放置方块 · 长按 破坏方块 · 连点两下跳跃键 飞行 · 点快捷栏切换方块'
+  '左下十字键 移动(连点两下 ↑ 疾跑) · 屏幕上滑动 转视角 · 轻点 放置方块 · 长按 破坏方块 · 连点两下跳跃键 飞行 · 右上角背包 · 点快捷栏切换方块'
 
 /** 尝试进入全屏并锁定横屏(Android Chrome 等支持;iOS Safari 会静默忽略) */
 function enterFullscreen() {
@@ -133,6 +134,23 @@ export default function App() {
   const [slot, setSlot] = useState(0)
   const [hotbarBlocks, setHotbarBlocks] = useState<number[]>([...HOTBAR])
   const [inventoryOpen, setInventoryOpen] = useState(false)
+  const inventoryOpenRef = useRef(false)
+  const setInventoryVisibility = useCallback((open: boolean) => {
+    inventoryOpenRef.current = open
+    setInventoryOpen(open)
+  }, [])
+  const openInventory = useCallback(() => {
+    setInventoryVisibility(true)
+    engineRef.current?.setActive(false)
+  }, [setInventoryVisibility])
+  const closeInventory = useCallback((restorePointerLock = true) => {
+    setInventoryVisibility(false)
+    const engine = engineRef.current
+    if (screenRef.current === 'playing') {
+      engine?.setActive(true)
+      if (restorePointerLock && engine && !engine.touchMode && !engine.isLocked() && !engine.noLock) engine.lock()
+    }
+  }, [setInventoryVisibility])
   const [info, setInfo] = useState<InfoPayload>({ text: '', chunkText: '', underwater: false, fly: false })
   const [touch, setTouch] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -141,9 +159,9 @@ export default function App() {
   const go = useCallback((s: Screen) => {
     screenRef.current = s
     setScreenState(s)
-    setInventoryOpen(false)
+    setInventoryVisibility(false)
     engineRef.current?.setActive(s === 'playing')
-  }, [])
+  }, [setInventoryVisibility])
 
   useEffect(() => {
     const engine = new Engine(canvasRef.current!)
@@ -153,13 +171,19 @@ export default function App() {
     engine.onTouchMode = setTouch
     setTouch(engine.touchMode)
     engine.onLockChange = (locked) => {
-      if (!locked && screenRef.current === 'playing') go('paused')
+      if (locked || screenRef.current !== 'playing') return
+      if (inventoryOpenRef.current) {
+        setInventoryVisibility(false)
+        engine.setActive(true)
+        return
+      }
+      go('paused')
     }
     return () => {
       engine.dispose()
       engineRef.current = null
     }
-  }, [go])
+  }, [go, setInventoryVisibility])
 
   useEffect(() => {
     engineRef.current?.setSettings(settings)
@@ -176,23 +200,32 @@ export default function App() {
     }
   }, [])
 
-  // Esc handling when pointer lock isn't available
+  // 指针锁定可用时由 pointerlockchange 负责 Esc；触屏/无锁定模式由这里处理。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Escape') return
       const s = screenRef.current
       const eng = engineRef.current
-      if (s === 'playing' && inventoryOpen) { setInventoryOpen(false); eng?.setActive(true) }
-      else if (s === 'playing') go('paused')
-      else if (s === 'paused') {
-        eng?.lock()
-        go('playing')
+      if (inventoryOpenRef.current) {
+        // 桌面浏览器按 Esc 会先退出指针锁定，再由 onLockChange 关闭背包。
+        if (s === 'playing' && eng && !eng.touchMode && eng.isLocked()) return
+        closeInventory(false)
+        return
+      }
+      if (s === 'playing') {
+        if (eng && !eng.touchMode && !eng.noLock) return
+        go('paused')
+      } else if (s === 'paused') {
+        if (eng?.touchMode || eng?.noLock) {
+          eng.lock()
+          go('playing')
+        }
       } else if (s === 'options') go(optionsFrom.current)
       else if (s === 'multi') go('title')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go, inventoryOpen])
+  }, [closeInventory, go])
 
   useEffect(() => {
     const onInventoryKey = (e: KeyboardEvent) => {
@@ -200,15 +233,13 @@ export default function App() {
       const target = e.target
       if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
       e.preventDefault()
-      setInventoryOpen((open) => {
-        const next = !open
-        engineRef.current?.setActive(!next)
-        return next
-      })
+      const next = !inventoryOpenRef.current
+      setInventoryVisibility(next)
+      engineRef.current?.setActive(!next)
     }
     window.addEventListener('keydown', onInventoryKey)
     return () => window.removeEventListener('keydown', onInventoryKey)
-  }, [])
+  }, [setInventoryVisibility])
 
   // 加载界面:真实等待视野内的区块生成完毕(至少 1 秒,最多 15 秒)
   useEffect(() => {
@@ -434,7 +465,7 @@ export default function App() {
         </div>
       )}
 
-      {inventoryOpen && screen === 'playing' && (
+      {inventoryOpen && (screen === 'playing' || screen === 'paused') && (
         <Inventory
           selected={slot}
           hotbar={hotbarBlocks}
@@ -448,7 +479,7 @@ export default function App() {
               return next
             })
           }}
-          onClose={() => { setInventoryOpen(false); if (screenRef.current === 'playing') engineRef.current?.setActive(true) }}
+          onClose={closeInventory}
         />
       )}
 
@@ -457,22 +488,20 @@ export default function App() {
         <TouchControls engineRef={engineRef} onPause={() => go('paused')} />
       )}
 
-      {/* 独立背包入口：置于触控视角层之上，确保手机/平板可见且可点 */}
-      {screen === 'playing' && !inventoryOpen && (
+      {/* 独立背包入口通过 Portal 挂到 body，脱离游戏画布/触控层的层叠上下文。 */}
+      {(screen === 'playing' || screen === 'paused') && !inventoryOpen && createPortal(
         <button
           type="button"
-          className="absolute right-3 z-30 flex min-h-12 items-center justify-center gap-2 rounded border-2 border-black bg-[#707070] px-5 py-3 text-base font-bold text-white shadow-[inset_2px_2px_0_rgba(255,255,255,0.4),inset_-2px_-2px_0_rgba(0,0,0,0.45),0_2px_8px_rgba(0,0,0,0.55)] active:bg-[#8b8b8b]"
-          style={{ top: 'calc(12px + env(safe-area-inset-top, 0px))', right: 'calc(12px + env(safe-area-inset-right, 0px))' }}
+          className="inventory-launcher"
           aria-label="打开背包"
+          aria-haspopup="dialog"
           aria-expanded={inventoryOpen}
-          onClick={() => {
-            setInventoryOpen(true)
-            engineRef.current?.setActive(false)
-          }}
+          onClick={openInventory}
         >
           <span aria-hidden="true">▦</span>
           <span>背包</span>
-        </button>
+        </button>,
+        document.body,
       )}
 
       {/* ------------------------------ PAUSE ------------------------------ */}
