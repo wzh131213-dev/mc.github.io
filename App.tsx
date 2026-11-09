@@ -6,11 +6,36 @@ import type { InfoPayload, Settings } from './engine'
 import Logo from './Logo'
 import TouchControls from './TouchControls'
 import { BLOCKS, HOTBAR, blockIcon, dirtDataURL } from './world'
-import Inventory from './Inventory'
+import MINECRAFT_REGISTRY from './minecraft-26.3-registry.json'
+import Inventory, { type InventoryStack } from './Inventory'
 
 type Screen = 'title' | 'options' | 'multi' | 'loading' | 'playing' | 'paused' | 'quit'
 
 const HOTBAR_STORAGE_KEY = 'mc-web-hotbar:v1'
+const BAG_STORAGE_KEY = 'mc-web-inventory:v1'
+const ITEM_IDS = new Set(MINECRAFT_REGISTRY.items.map((item) => item.id))
+
+function readSavedInventory(): InventoryStack[] {
+  try {
+    const raw = window.localStorage.getItem(BAG_STORAGE_KEY)
+    const value: unknown = raw ? JSON.parse(raw) : null
+    if (
+      Array.isArray(value) &&
+      value.length === 27 &&
+      value.every((slot) => slot === null || (
+        typeof slot === 'object' && slot !== null &&
+        Number.isInteger((slot as { itemId?: unknown }).itemId) &&
+        ITEM_IDS.has((slot as { itemId: number }).itemId) &&
+        Number.isInteger((slot as { count?: unknown }).count) &&
+        (slot as { count: number }).count > 0 &&
+        (slot as { count: number }).count <= 64
+      ))
+    ) return value as InventoryStack[]
+  } catch {
+    // 损坏或不可用的存档回退为空背包。
+  }
+  return Array.from({ length: 27 }, () => null)
+}
 
 function readSavedHotbar(): number[] {
   try {
@@ -150,6 +175,7 @@ export default function App() {
   }))
   const [slot, setSlot] = useState(0)
   const [hotbarBlocks, setHotbarBlocks] = useState<number[]>(readSavedHotbar)
+  const [bagSlots, setBagSlots] = useState<InventoryStack[]>(readSavedInventory)
   const [saveWarning, setSaveWarning] = useState(false)
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const inventoryOpenRef = useRef(false)
@@ -214,9 +240,17 @@ export default function App() {
     try {
       window.localStorage.setItem(HOTBAR_STORAGE_KEY, JSON.stringify(hotbarBlocks))
     } catch {
-      // 本地存储不可用时保留内存中的快捷栏，不阻断游戏。
+      setSaveWarning(true)
     }
   }, [hotbarBlocks])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(BAG_STORAGE_KEY, JSON.stringify(bagSlots))
+    } catch {
+      setSaveWarning(true)
+    }
+  }, [bagSlots])
 
   // iOS Safari 忽略 user-scalable=no,需要拦截捏合手势
   useEffect(() => {
@@ -508,6 +542,7 @@ export default function App() {
         <Inventory
           selected={slot}
           hotbar={hotbarBlocks}
+          bag={bagSlots}
           onSelect={(i) => { engineRef.current?.selectSlot(i); setSlot(i) }}
           onEquip={(id, targetSlot) => {
             const target = targetSlot ?? slot
@@ -518,6 +553,30 @@ export default function App() {
               return next
             })
           }}
+          onGive={(itemId, count) => {
+            const item = MINECRAFT_REGISTRY.items.find((entry) => entry.id === itemId)
+            if (!item) return
+            const maxStack = Math.min(64, Math.max(1, item.stack))
+            setBagSlots((current) => {
+              const next = [...current]
+              let remaining = Math.min(count, maxStack)
+              for (let i = 0; i < next.length && remaining > 0; i++) {
+                const stack = next[i]
+                if (stack?.itemId !== itemId || stack.count >= maxStack) continue
+                const added = Math.min(maxStack - stack.count, remaining)
+                next[i] = { itemId, count: stack.count + added }
+                remaining -= added
+              }
+              for (let i = 0; i < next.length && remaining > 0; i++) {
+                if (next[i] !== null) continue
+                const added = Math.min(maxStack, remaining)
+                next[i] = { itemId, count: added }
+                remaining -= added
+              }
+              return next
+            })
+          }}
+          onRemove={(index) => setBagSlots((current) => current.map((stack, i) => i === index ? null : stack))}
           onClose={closeInventory}
         />
       )}
