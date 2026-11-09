@@ -235,3 +235,9 @@ test('title screen uses ME WORLD branding and displays the requested Minecraft d
   assert.ok(logo.includes("const WORD = 'me world'"))
   assert.ok(app.includes('Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.'))
 })
+
+test('pixel logo supports spaces in the ME WORLD title without missing glyphs', async () => {
+  const logo = await read('Logo.tsx')
+  assert.ok(logo.includes("' ': ['00000', '00000', '00000', '00000', '00000', '00000', '00000']"))
+  assert.ok(logo.includes("const WORD = 'me world'"))
+})
