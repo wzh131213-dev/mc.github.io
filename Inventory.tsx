@@ -14,7 +14,7 @@ const NAMES: Record<number, string> = {
 }
 
 export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose }: Props) {
-  const items = [...HOTBAR, ...Array.from({ length: 18 }, (_, i) => HOTBAR[i % HOTBAR.length])]
+  const items: (number | null)[] = [...HOTBAR, ...Array.from({ length: 18 }, () => null)]
   return (
     <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-3" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <section className="w-[min(560px,96vw)] border-4 border-[#242424] bg-[#c6c6c6] p-3 text-[#202020] shadow-[0_8px_32px_#0009]" aria-label="背包物品栏">
@@ -25,12 +25,16 @@ export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose
         <div className="mb-2 text-xs text-[#444]">物品栏 · 点击物品放入当前快捷栏位置</div>
         <div className="grid grid-cols-9 gap-1">
           {items.map((id, i) => (
-            <button key={i} draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', String(id))}
-              onClick={() => onEquip(id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onEquip(id) }}
-              title={NAMES[id] || '方块'}
+            <button key={i} disabled={id === null} draggable={id !== null}
+              onDragStart={(e) => { if (id !== null) e.dataTransfer.setData('text/plain', String(id)) }}
+              onClick={() => { if (id !== null) onEquip(id) }}
+              onKeyDown={(e) => { if (id !== null && (e.key === 'Enter' || e.key === ' ')) onEquip(id) }}
+              title={id === null ? '空槽' : NAMES[id] || '方块'}
               className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444] active:bg-[#aaa]">
-              <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
-              <span className="absolute right-1 bottom-0 text-[10px] font-bold text-white" style={{ textShadow: '1px 1px #222' }}>64</span>
+              {id !== null && <>
+                <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
+                <span className="absolute right-1 bottom-0 text-[10px] font-bold text-white" style={{ textShadow: '1px 1px #222' }}>64</span>
+              </>}
             </button>
           ))}
         </div>
