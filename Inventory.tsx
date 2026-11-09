@@ -125,7 +125,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
         </header>
 
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索物品名称 / 英文 ID..." aria-label="搜索物品" className="min-w-0 flex-1 border-2 border-[#555] bg-white px-3 py-2 text-sm text-black outline-none focus:border-[#315f9c]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索物品中文名称或编号..." aria-label="搜索物品" className="min-w-0 flex-1 border-2 border-[#555] bg-white px-3 py-2 text-sm text-black outline-none focus:border-[#315f9c]" />
           <span className="whitespace-nowrap text-xs text-[#444]">{visibleItems.length} / {MINECRAFT_REGISTRY.itemCount}</span>
         </div>
 
@@ -162,7 +162,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-2 border-[#777] bg-[#b4b4b4] px-2 py-2">
             <div className="min-w-0 text-xs">
               <strong className="block truncate">{itemName(selectedItem)}</strong>
-              <span className="text-[#555]">{selectedItem.name} · 堆叠上限 {selectedItem.stack}</span>
+              <span className="text-[#555]">物品编号 {selectedItem.id} · 堆叠上限 {selectedItem.stack}</span>
             </div>
             <div className="flex gap-2">
               {selectedBlockId !== undefined && <button onClick={() => onEquip(selectedBlockId)} className="min-h-9 border-2 border-[#333] bg-[#4776a8] px-3 text-xs font-bold text-white">放入快捷栏</button>}
