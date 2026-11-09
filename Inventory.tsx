@@ -197,13 +197,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
                   setSelectedBagSlot(null)
                   return
                 }
-                if (stack && blockId !== undefined) {
-                  onEquip(blockId)
-                } else if (stack) {
-                  setSelectedBagSlot(i)
-                } else {
-                  setSelectedBagSlot(i)
-                }
+                setSelectedBagSlot(i)
               }}
                 title={stack && item ? `${itemName(item)} × ${stack.count}` : `背包空格 ${i + 1}`}
                 aria-label={stack && item ? `${itemName(item)}，数量 ${stack.count}` : `背包空格 ${i + 1}`}
@@ -215,12 +209,19 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
           })}
         </div>
 
-        {selectedBagSlot !== null && bag[selectedBagSlot] && (
-          <div className="mt-2 flex items-center justify-between gap-2 border-2 border-[#777] bg-[#b4b4b4] p-2 text-xs">
-            <span>已选中：{(() => { const entry = MINECRAFT_REGISTRY.items.find((x) => x.id === bag[selectedBagSlot]?.itemId); return entry ? `${itemName(entry)} × ${bag[selectedBagSlot]?.count}` : '未知物品' })()}</span>
-            <button onClick={() => { onRemove(selectedBagSlot); setSelectedBagSlot(null) }} className="min-h-9 border-2 border-[#333] bg-[#8b4141] px-3 text-white">丢弃整组</button>
-          </div>
-        )}
+        {selectedBagSlot !== null && bag[selectedBagSlot] && (() => {
+          const entry = MINECRAFT_REGISTRY.items.find((x) => x.id === bag[selectedBagSlot]?.itemId)
+          const placeableId = entry ? BLOCK_ID_BY_NAME[entry.name] : undefined
+          return (
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-2 border-[#777] bg-[#b4b4b4] p-2 text-xs">
+              <span>已选中：{entry ? `${itemName(entry)} × ${bag[selectedBagSlot]?.count}` : '未知物品'}</span>
+              <div className="flex gap-2">
+                {placeableId !== undefined && <button onClick={() => { onEquip(placeableId); setSelectedBagSlot(null) }} className="min-h-9 border-2 border-[#333] bg-[#4776a8] px-3 text-white">装备到当前快捷栏</button>}
+                <button onClick={() => { onRemove(selectedBagSlot); setSelectedBagSlot(null) }} className="min-h-9 border-2 border-[#333] bg-[#8b4141] px-3 text-white">丢弃整组</button>
+              </div>
+            </div>
+          )
+        })()}
         <div className="mt-3 mb-1 text-sm font-bold">快捷栏 · 选择一个位置，再从物品栏放入方块</div>
         <div className="grid grid-cols-9 gap-1">
           {hotbar.map((id, i) => (
