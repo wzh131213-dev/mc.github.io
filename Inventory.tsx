@@ -92,14 +92,7 @@ function itemGlyph(name: string) {
   return name.slice(0, 2).toUpperCase()
 }
 
-function itemColor(name: string) {
-  let hash = 2166136261
-  for (let i = 0; i < name.length; i++) hash = Math.imul(hash ^ name.charCodeAt(i), 16777619)
-  const hue = (hash >>> 0) % 360
-  return `hsl(${hue} 38% 42%)`
-}
-
-const ITEM_TEXTURE_BASE = `${import.meta.env.BASE_URL}minecraft-item-textures/`
+const ITEM_TEXTURE_BASE = new URL('minecraft-item-textures/', document.baseURI).toString()
 
 function ItemTexture({ name, className = 'h-8 w-8', fallbackSrc }: { name: string; className?: string; fallbackSrc?: string }) {
   const [failed, setFailed] = useState(false)
