@@ -87,10 +87,12 @@ function getBlockTint(blockId: number): [number, number, number] {
 // Blocks with full collision and blocks that occlude neighbouring faces.
 const OCC = new Uint8Array(8192)
 const SOLID = new Uint8Array(8192)
+const TRANSPARENT = new Uint8Array(8192)
 ;[GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE, GLASS].forEach((b) => { OCC[b] = 1; SOLID[b] = 1 })
 for (const block of MINECRAFT_REGISTRY.blocks) {
   const id = BLOCK_ID_BY_NAME[block.name]
   if (block.boundingBox === 'block') SOLID[id] = 1
+  if (block.transparent) TRANSPARENT[id] = 1
   if (block.boundingBox === 'block' && !block.transparent) OCC[id] = 1
 }
 
@@ -702,8 +704,8 @@ export class World {
             const nb = this.get(x + f.n[0], y + f.n[1], z + f.n[2])
             if (isWater) {
               if (nb !== AIR) continue
-            } else if (b === GLASS) {
-              if (nb === GLASS || OCC[nb]) continue
+            } else if (TRANSPARENT[b]) {
+              if (nb === b || OCC[nb]) continue
             } else if (OCC[nb]) continue
 
             const tile = tiles[f.ti]
