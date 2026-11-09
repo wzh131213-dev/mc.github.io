@@ -320,6 +320,8 @@ export class Chunk {
   data = new Uint8Array(CS * CS * SY)
   /** 本区块内最高的非空气方块高度,网格化时只扫到这一层 */
   maxY = 0
+  /** 本区块被玩家修改过的体素索引及最终方块 ID,用于本机存档 */
+  overrides = new Map<number, number>()
   /** 被玩家改过的区块:永远不会被回收,否则改动会丢失 */
   modified = false
   constructor(
@@ -329,16 +331,79 @@ export class Chunk {
 }
 
 const TREE_MARGIN = 2
+const WORLD_SAVE_PREFIX = 'mc-web-world:v1:'
 
 export class World {
   chunks = new Map<number, Chunk>()
   panorama = { x: 0, y: 40, z: 0 }
   private seed: number
   private last: Chunk | null = null
+  private storage: Storage | null
 
-  constructor(seed = 7) {
+  constructor(seed = 7, storage?: Storage | null) {
     this.seed = seed
+    this.storage = storage === undefined ? this.resolveStorage() : storage
     this.panorama = this.findPanoramaSpot()
+  }
+
+  private resolveStorage(): Storage | null {
+    try {
+      return typeof window !== 'undefined' ? window.localStorage : null
+    } catch {
+      return null
+    }
+  }
+
+  private storageKey(cx: number, cz: number) {
+    return `${WORLD_SAVE_PREFIX}${this.seed}:${cx}:${cz}`
+  }
+
+  private restoreChunk(chunk: Chunk) {
+    if (!this.storage) return
+    const key = this.storageKey(chunk.cx, chunk.cz)
+    try {
+      const raw = this.storage.getItem(key)
+      if (!raw) return
+      const saved = JSON.parse(raw) as { version?: unknown; edits?: unknown }
+      if (saved.version !== 1 || !Array.isArray(saved.edits)) return
+
+      let maxY = chunk.maxY
+      for (const edit of saved.edits) {
+        if (!Array.isArray(edit) || edit.length !== 2) continue
+        const [index, block] = edit
+        if (!Number.isInteger(index) || index < 0 || index >= chunk.data.length) continue
+        if (!Number.isInteger(block) || (block !== AIR && !BLOCKS.includes(block as (typeof BLOCKS)[number]))) continue
+        chunk.data[index] = block
+        chunk.overrides.set(index, block)
+        if (block !== AIR) maxY = Math.max(maxY, Math.floor(index / (CS * CS)))
+      }
+      chunk.maxY = maxY
+      chunk.modified = chunk.overrides.size > 0
+    } catch {
+      // 损坏的存档不能阻止世界加载；删除损坏的当前区块存档。
+      try { this.storage.removeItem(key) } catch { /* 忽略不可用的存储 */ }
+    }
+  }
+
+  private persistChunk(chunk: Chunk): boolean {
+    if (!this.storage) return false
+    const key = this.storageKey(chunk.cx, chunk.cz)
+    try {
+      if (chunk.overrides.size === 0) this.storage.removeItem(key)
+      else this.storage.setItem(key, JSON.stringify({ version: 1, edits: [...chunk.overrides] }))
+      return true
+    } catch {
+      // 配额已满或浏览器禁用本地存储时，游戏仍可继续，但退出前会报告保存失败。
+      return false
+    }
+  }
+
+  save(): boolean {
+    if (!this.storage) return false
+    for (const chunk of this.chunks.values()) {
+      if (chunk.modified && !this.persistChunk(chunk)) return false
+    }
+    return true
   }
 
   /* ------------------------------ 地形函数 ------------------------------ */
@@ -427,6 +492,7 @@ export class World {
     let c = this.chunks.get(k)
     if (!c) {
       c = this.generateChunk(cx, cz)
+      this.restoreChunk(c)
       this.chunks.set(k, c)
     }
     return c
@@ -462,9 +528,12 @@ export class World {
     if (y < 0 || y >= SY) return
     if (!Number.isInteger(b) || (b !== AIR && !BLOCKS.includes(b as (typeof BLOCKS)[number]))) return
     const c = this.getChunk(x >> 4, z >> 4)
-    c.data[(y * CS + (z & 15)) * CS + (x & 15)] = b
+    const index = (y * CS + (z & 15)) * CS + (x & 15)
+    c.data[index] = b
+    c.overrides.set(index, b)
     c.modified = true
-    if (y > c.maxY) c.maxY = y
+    if (b !== AIR && y > c.maxY) c.maxY = y
+    this.persistChunk(c)
   }
 
   isSolid(x: number, y: number, z: number) {
