@@ -3,7 +3,6 @@
 import hashlib
 import io
 import json
-import os
 import shutil
 import urllib.parse
 import urllib.request
@@ -74,20 +73,34 @@ def fallback(name, face):
 
 def pick(textures, name, face):
     suffixes = {"top": ("_top", "_end"), "bottom": ("_bottom", "_end"), "side": ("_side", "_front", "_all")}
-    direct = [name + suffix for suffix in suffixes[face]] + [name]
-    for candidate in direct:
-        if candidate in textures:
-            return textures[candidate]
-    # Slabs, stairs, walls, doors, signs and redstone variants usually share their material texture.
-    base = name
-    for suffix in ("_stairs", "_slab", "_wall", "_fence_gate", "_fence", "_button", "_pressure_plate", "_door", "_trapdoor", "_sign", "_hanging_sign", "_wall_sign", "_head", "_skull", "_banner", "_bed", "_carpet"):
-        if base.endswith(suffix):
-            base = base[:-len(suffix)]
-            break
-    candidates = [base, base + "_planks", base + "_log", base + "_block", base.replace("_block", ""), "stone"]
-    for candidate in candidates:
-        if candidate in textures:
-            return textures[candidate]
+    aliases = [name]
+    # Wall-mounted variants reuse the corresponding standing block texture.
+    aliases.append(name.replace("_wall_", "_"))
+    if name.startswith("potted_"):
+        aliases.append(name[len("potted_"):])
+    # Strip the longest suffix first so oak_wall_sign does not become oak_wall.
+    suffixes_to_strip = (
+        "_wall_hanging_sign", "_wall_coral_fan", "_wall_banner", "_wall_head",
+        "_wall_skull", "_wall_torch", "_wall_sign", "_hanging_sign", "_standing_sign",
+        "_fence_gate", "_pressure_plate", "_trapdoor", "_stairs", "_slab", "_fence",
+        "_button", "_door", "_sign", "_head", "_skull", "_banner", "_bed", "_carpet",
+        "_coral_fan", "_wall",
+    )
+    for alias in tuple(aliases):
+        base = alias
+        for suffix in suffixes_to_strip:
+            if base.endswith(suffix):
+                base = base[:-len(suffix)]
+                break
+        aliases.extend((base, base + "_planks", base + "_log", base + "_block", base.replace("_block", "")))
+    seen = set()
+    for alias in aliases:
+        if not alias or alias in seen:
+            continue
+        seen.add(alias)
+        for candidate in tuple(alias + suffix for suffix in suffixes[face]) + (alias,):
+            if candidate in textures:
+                return textures[candidate]
     return None
 
 def main():
