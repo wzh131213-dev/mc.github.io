@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import MINECRAFT_REGISTRY from './minecraft-26.3-registry.json'
+import MINECRAFT_ZH_CN from './minecraft-26.3-zh-cn.json'
 import { BLOCK_ID_BY_NAME, BLOCK_META_BY_NAME, blockIcon } from './world'
 
 export type InventoryStack = { itemId: number; count: number } | null
@@ -71,7 +72,7 @@ function categoryOf(item: CatalogItem): Category {
 }
 
 function itemName(item: CatalogItem) {
-  return CN_NAMES[item.name] || item.label
+  return MINECRAFT_ZH_CN[item.name] || CN_NAMES[item.name] || item.label
 }
 
 function itemGlyph(name: string) {
