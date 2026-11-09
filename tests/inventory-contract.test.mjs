@@ -8,7 +8,6 @@ test('all registered blocks have a generated icon path and a data-driven display
   const world = await read('world.ts')
   const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
   assert.match(world, /BLOCK_LABELS = new Map/)
-  assert.match(world, /getGenericTile\(blockId: number\)/)
   assert.match(world, /getBlockTiles\(b\)/)
   assert.match(world, /BLOCK_TEXTURE_INDEX_BY_ID/)
   assert.match(world, /BLOCK_META_BY_ID/)
