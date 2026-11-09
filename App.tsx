@@ -210,7 +210,7 @@ export default function App() {
       const s = screenRef.current
       const eng = engineRef.current
       if (inventoryOpenRef.current) {
-        // 桌面浏览器按 Esc 会先退出指针锁定，再由 onLockChange 关闭背包。
+        // 桌面浏览器按 Esc 会退出指针锁定；随后由此处理器关闭背包。
         if (s === 'playing' && eng && !eng.touchMode && eng.isLocked()) return
         closeInventory(false)
         return
@@ -239,6 +239,7 @@ export default function App() {
       const engine = engineRef.current
       engine?.setActive(!next && screenRef.current === 'playing')
       if (next) engine?.unlock()
+      else if (screenRef.current === 'playing' && engine && !engine.touchMode && !engine.noLock) engine.lock()
     }
     window.addEventListener('keydown', onInventoryKey)
     return () => window.removeEventListener('keydown', onInventoryKey)
