@@ -380,7 +380,7 @@ export default function App() {
               className="mc-text -mt-1 self-end pr-[4%] text-[clamp(12px,1.6vw,18px)] font-bold tracking-[0.3em] italic"
               style={{ color: '#e6e6e6' }}
             >
-              WEB EDITION
+              网页版本
             </div>
           </div>
 
@@ -393,14 +393,14 @@ export default function App() {
           <div className="relative mt-[5vh] flex w-[min(400px,90vw)] flex-col gap-2">
             <McButton onClick={startGame}>单人游戏</McButton>
             <McButton onClick={() => go('multi')}>多人游戏</McButton>
-            <McButton disabled>Minecraft Realms</McButton>
+            <McButton disabled>领域服务器</McButton>
             <div className="mt-4 flex gap-2 [@media(max-height:440px)]:mt-0">
               <McButton onClick={() => openOptions('title')}>选项...</McButton>
               <McButton onClick={() => go('quit')}>退出游戏</McButton>
             </div>
           </div>
 
-          <div className="mc-text safe-bl absolute text-[15px]">Minecraft Java 26.3</div>
+          <div className="mc-text safe-bl absolute text-[15px]">我的世界 Java 版 26.3</div>
           <div className="mc-text safe-br absolute text-[15px]">版权所有 Mojang AB,请勿散布!</div>
         </div>
       )}
@@ -413,11 +413,11 @@ export default function App() {
             <div className="flex items-center gap-3 border-2 border-transparent p-2 hover:border-[#9a9a9a]">
               <img src={blockIcon(1)} alt="" className="h-16 w-16" style={{ imageRendering: 'pixelated' }} />
               <div className="flex-1">
-                <div className="mc-text text-[18px]">Minecraft 服务器</div>
+                <div className="mc-text text-[18px]">我的世界服务器</div>
                 <div className="text-[16px] text-[#ff5555]" style={{ textShadow: '2px 2px 0 #3f1515' }}>
                   无法连接到服务器
                 </div>
-                <div className="text-[14px] text-[#a0a0a0]">localhost:25565</div>
+                <div className="text-[14px] text-[#a0a0a0]">本地地址：25565</div>
               </div>
               <div className="mr-2 flex items-end gap-[2px]">
                 {[8, 12, 16, 20, 24].map((h) => (
@@ -504,7 +504,7 @@ export default function App() {
         <div className="pointer-events-none absolute inset-0 z-10">
           {info.underwater && <div className="absolute inset-0 bg-[#1b4fd6]/35" />}
           <div className="mc-text safe-tl absolute text-[14px] leading-5">
-            <div>Minecraft Java 26.3 (web/vanilla)</div>
+            <div>我的世界 Java 版 26.3（网页原版模式）</div>
             <div>{info.text}</div>
             <div>{info.chunkText}</div>
           </div>
