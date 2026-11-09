@@ -14,6 +14,7 @@ type Screen = 'title' | 'options' | 'multi' | 'loading' | 'playing' | 'paused' |
 const HOTBAR_STORAGE_KEY = 'mc-web-hotbar:v1'
 const BAG_STORAGE_KEY = 'mc-web-inventory:v1'
 const ITEM_IDS = new Set(MINECRAFT_REGISTRY.items.map((item) => item.id))
+const ITEM_STACK_LIMITS = new Map(MINECRAFT_REGISTRY.items.map((item) => [item.id, item.stack]))
 
 function readSavedInventory(): InventoryStack[] {
   try {
@@ -28,7 +29,7 @@ function readSavedInventory(): InventoryStack[] {
         ITEM_IDS.has((slot as { itemId: number }).itemId) &&
         Number.isInteger((slot as { count?: unknown }).count) &&
         (slot as { count: number }).count > 0 &&
-        (slot as { count: number }).count <= 64
+        (slot as { count: number }).count <= (ITEM_STACK_LIMITS.get((slot as { itemId: number }).itemId) ?? 0)
       ))
     ) return value as InventoryStack[]
   } catch {
@@ -235,6 +236,10 @@ export default function App() {
   useEffect(() => {
     engineRef.current?.setSettings(settings)
   }, [settings])
+
+  useEffect(() => {
+    if (engineRef.current) engineRef.current.hotbar = [...hotbarBlocks]
+  }, [hotbarBlocks])
 
   useEffect(() => {
     try {
