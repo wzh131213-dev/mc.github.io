@@ -42,6 +42,10 @@ test('inventory launcher is mounted above the game layers and remains available 
   assert.match(app, /inventoryOpenRef/)
   assert.match(app, /if \(inventoryOpenRef\.current\) \{/)
   assert.match(app, /inventoryOpen && \(screen === 'playing' \|\| screen === 'paused'\)/)
+  assert.match(app, /engine\?\.unlock\(\)/)
+  assert.match(app, /engine\.setActive\(false\)/)
+  assert.match(app, /if \(inventoryOpenRef\.current\) \{[\s\S]*?engine\.setActive\(false\)/)
+  assert.match(app, /else if \(screenRef\.current === 'playing'[\s\S]*?engine\.lock\(\)/)
 })
 
 test('mining water is supported while water remains replaceable when placing blocks', async () => {
@@ -59,4 +63,16 @@ test('invalid block IDs are rejected before mutating chunk data', async () => {
   assert.notEqual(validation, -1, 'World.set must validate IDs')
   assert.ok(validation < write, 'validation must occur before the typed-array write')
   assert.match(world, /const OCC = new Uint8Array\(256\)/)
+})
+
+test('Pages deployment refuses to publish the uncompiled branch source', async () => {
+  const workflow = await read('.github/workflows/deploy.yml')
+  assert.match(workflow, /gh api "repos\/\$\{GITHUB_REPOSITORY\}\/pages" --jq '\.build_type'/)
+  assert.match(workflow, /pages_source.*!= "workflow"/)
+  assert.match(workflow, /Source to GitHub Actions/)
+})
+
+test('the production build is configured for the project Pages base path', async () => {
+  const vite = await read('vite.config.ts')
+  assert.match(vite, /base: '\.\/'/)
 })
