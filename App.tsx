@@ -141,7 +141,10 @@ export default function App() {
   }, [])
   const openInventory = useCallback(() => {
     setInventoryVisibility(true)
-    engineRef.current?.setActive(false)
+    const engine = engineRef.current
+    engine?.setActive(false)
+    // 桌面模式打开物品栏时释放鼠标指针锁定，让关闭/替换按钮真正可点击。
+    engine?.unlock()
   }, [setInventoryVisibility])
   const closeInventory = useCallback((restorePointerLock = true) => {
     setInventoryVisibility(false)
@@ -171,13 +174,13 @@ export default function App() {
     engine.onTouchMode = setTouch
     setTouch(engine.touchMode)
     engine.onLockChange = (locked) => {
-      if (locked || screenRef.current !== 'playing') return
+      if (locked) return
+      // 打开背包时主动释放鼠标锁定，但不应因此关闭背包或进入暂停菜单。
       if (inventoryOpenRef.current) {
-        setInventoryVisibility(false)
-        engine.setActive(true)
+        engine.setActive(false)
         return
       }
-      go('paused')
+      if (screenRef.current === 'playing') go('paused')
     }
     return () => {
       engine.dispose()
@@ -216,10 +219,8 @@ export default function App() {
         if (eng && !eng.touchMode && !eng.noLock) return
         go('paused')
       } else if (s === 'paused') {
-        if (eng?.touchMode || eng?.noLock) {
-          eng.lock()
-          go('playing')
-        }
+        eng?.lock()
+        go('playing')
       } else if (s === 'options') go(optionsFrom.current)
       else if (s === 'multi') go('title')
     }
@@ -229,13 +230,15 @@ export default function App() {
 
   useEffect(() => {
     const onInventoryKey = (e: KeyboardEvent) => {
-      if (e.code !== 'KeyE' || screenRef.current !== 'playing' || e.repeat) return
+      if (e.code !== 'KeyE' || !['playing', 'paused'].includes(screenRef.current) || e.repeat) return
       const target = e.target
       if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
       e.preventDefault()
       const next = !inventoryOpenRef.current
       setInventoryVisibility(next)
-      engineRef.current?.setActive(!next)
+      const engine = engineRef.current
+      engine?.setActive(!next && screenRef.current === 'playing')
+      if (next) engine?.unlock()
     }
     window.addEventListener('keydown', onInventoryKey)
     return () => window.removeEventListener('keydown', onInventoryKey)
