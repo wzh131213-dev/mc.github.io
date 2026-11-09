@@ -5,10 +5,27 @@ import { Engine } from './engine'
 import type { InfoPayload, Settings } from './engine'
 import Logo from './Logo'
 import TouchControls from './TouchControls'
-import { HOTBAR, blockIcon, dirtDataURL } from './world'
+import { BLOCKS, HOTBAR, blockIcon, dirtDataURL } from './world'
 import Inventory from './Inventory'
 
 type Screen = 'title' | 'options' | 'multi' | 'loading' | 'playing' | 'paused' | 'quit'
+
+const HOTBAR_STORAGE_KEY = 'mc-web-hotbar:v1'
+
+function readSavedHotbar(): number[] {
+  try {
+    const raw = window.localStorage.getItem(HOTBAR_STORAGE_KEY)
+    const value: unknown = raw ? JSON.parse(raw) : null
+    if (
+      Array.isArray(value) &&
+      value.length === 9 &&
+      value.every((id) => Number.isInteger(id) && BLOCKS.includes(id as (typeof BLOCKS)[number]))
+    ) return value as number[]
+  } catch {
+    // 浏览器隐私模式可能禁用本地存储；回退到默认快捷栏。
+  }
+  return [...HOTBAR]
+}
 
 const SPLASHES = [
   '你好,世界!',
@@ -132,7 +149,8 @@ export default function App() {
     chunks: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 6 : 8,
   }))
   const [slot, setSlot] = useState(0)
-  const [hotbarBlocks, setHotbarBlocks] = useState<number[]>([...HOTBAR])
+  const [hotbarBlocks, setHotbarBlocks] = useState<number[]>(readSavedHotbar)
+  const [saveWarning, setSaveWarning] = useState(false)
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const inventoryOpenRef = useRef(false)
   const setInventoryVisibility = useCallback((open: boolean) => {
@@ -191,6 +209,14 @@ export default function App() {
   useEffect(() => {
     engineRef.current?.setSettings(settings)
   }, [settings])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(HOTBAR_STORAGE_KEY, JSON.stringify(hotbarBlocks))
+    } catch {
+      // 本地存储不可用时保留内存中的快捷栏，不阻断游戏。
+    }
+  }, [hotbarBlocks])
 
   // iOS Safari 忽略 user-scalable=no,需要拦截捏合手势
   useEffect(() => {
@@ -266,6 +292,7 @@ export default function App() {
   }, [screen, go])
 
   const startGame = () => {
+    setSaveWarning(false)
     engineRef.current?.lock()
     if (engineRef.current?.touchMode) enterFullscreen()
     go('loading')
@@ -277,8 +304,10 @@ export default function App() {
   }
 
   const toTitle = () => {
-    go('title')
     const eng = engineRef.current
+    // 区块修改在每次操作时已自动保存；退出时再统一写入并检查存储状态。
+    setSaveWarning(!(eng?.saveWorld() ?? false))
+    go('title')
     eng?.unlock()
     eng?.setMode('panorama')
   }
@@ -315,6 +344,12 @@ export default function App() {
               WEB EDITION
             </div>
           </div>
+
+          {saveWarning && (
+            <div role="status" className="mc-text absolute top-2 max-w-[92vw] rounded border border-[#b88632] bg-black/80 px-3 py-2 text-center text-sm text-[#ffd77a]">
+              本地存储不可用：当前世界修改可能无法保存
+            </div>
+          )}
 
           <div className="relative mt-[5vh] flex w-[min(400px,90vw)] flex-col gap-2">
             <McButton onClick={startGame}>单人游戏</McButton>
