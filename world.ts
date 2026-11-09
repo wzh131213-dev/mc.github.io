@@ -57,16 +57,6 @@ const BLOCK_TILES: Record<number, [number, number, number]> = {
   [GLASS]: [11, 11, 11],
 }
 
-function getGenericTile(blockId: number) {
-  const meta = BLOCK_META_BY_ID.get(blockId)
-  if (!meta) return 12
-  const name = meta.name
-  if (/leaves|sapling|flower|grass|fern|moss|vine|shrub|mushroom|petal/.test(name)) return 14
-  if (/log|wood|planks|sign|boat|bamboo|shelf|fence|door|trapdoor/.test(name)) return 13
-  if (/dirt|sand|gravel|mud|clay|soil|root|powder/.test(name)) return 12
-  return 15
-}
-
 function getBlockTiles(blockId: number): [number, number, number] {
   const legacy = BLOCK_TILES[blockId]
   if (legacy) return legacy
@@ -345,7 +335,7 @@ const iconCache = new Map<number, string>()
 export function onAtlasReady(listener: () => void) {
   atlasReadyListeners.add(listener)
   if (atlasLoaded) listener()
-  return () => atlasReadyListeners.delete(listener)
+  return () => { atlasReadyListeners.delete(listener) }
 }
 export function getAtlasTexture() {
   if (atlasTex) return atlasTex
