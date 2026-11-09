@@ -117,14 +117,14 @@ export function getAtlas() {
 
   const grassPx = (): [number, number, number, number] => {
     const d = v(16)
-    return [92 + d * 0.6, 158 + d, 50 + d * 0.4, 255]
+    return [112 + d * 0.45, 145 + d * 0.75, 108 + d * 0.5, 255]
   }
   const dirtPx = (): [number, number, number, number] => {
     const r = rnd()
     let d = v(8)
     if (r < 0.14) d -= 22
     else if (r > 0.9) d += 16
-    return [134 + d, 96 + d * 0.8, 67 + d * 0.6, 255]
+    return [139 + d, 120 + d * 0.8, 103 + d * 0.6, 255]
   }
 
   // 0 grass top
@@ -138,31 +138,31 @@ export function getAtlas() {
   put(3, () => {
     let d = v(9)
     if (rnd() < 0.1) d -= 22
-    return [125 + d, 125 + d, 127 + d, 255]
+    return [137 + d, 141 + d, 143 + d, 255]
   })
   // 4 sand
   put(4, () => {
     const d = v(7)
-    return [219 + d, 207 + d, 163 + d, 255]
+    return [207 + d, 199 + d, 178 + d, 255]
   })
   // 5 water
   put(5, () => {
     const d = v(10)
-    return [38 + d * 0.5, 92 + d, 214 + d, 255]
+    return [93 + d * 0.35, 135 + d, 151 + d, 255]
   })
   // 6 log side
   const stripe = Array.from({ length: TILE }, () => v(16))
   put(6, (x) => {
     let s = stripe[x]
     if (rnd() < 0.06) s -= 20
-    return [104 + s + v(5), 83 + s + v(4), 52 + s + v(3), 255]
+    return [123 + s + v(5), 105 + s + v(4), 82 + s + v(3), 255]
   })
   // 7 log top
   put(7, (x, y) => {
     const dist = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5))
-    if (dist > 7) return [100 + v(5), 80 + v(4), 50 + v(3), 255]
+    if (dist > 7) return [116 + v(5), 98 + v(4), 77 + v(3), 255]
     const ring = Math.floor(dist) % 2
-    return ring ? [160 + v(5), 127 + v(4), 74 + v(3), 255] : [196 + v(5), 160 + v(4), 98 + v(3), 255]
+    return ring ? [151 + v(5), 129 + v(4), 101 + v(3), 255] : [177 + v(5), 153 + v(4), 119 + v(3), 255]
   })
   // 8 leaves
   put(8, () => {
@@ -170,17 +170,17 @@ export function getAtlas() {
     if (r < 0.2) return [0, 0, 0, 0]
     let d = v(20)
     if (r > 0.8) d -= 28
-    return [48 + d * 0.6, 122 + d, 36 + d * 0.5, 255]
+    return [88 + d * 0.4, 126 + d, 88 + d * 0.5, 255]
   })
   // 9 planks
   const boardShade = [0, -10, 8, -5]
   const joint = Array.from({ length: 4 }, () => 2 + Math.floor(rnd() * 12))
   put(9, (x, y) => {
     const board = Math.floor(y / 4)
-    if (y % 4 === 3) return [112, 86, 48, 255]
-    if (x === joint[board]) return [128, 100, 58, 255]
+    if (y % 4 === 3) return [121, 105, 83, 255]
+    if (x === joint[board]) return [139, 120, 94, 255]
     const d = boardShade[board] + v(5)
-    return [170 + d, 136 + d, 84 + d, 255]
+    return [164 + d, 143 + d, 112 + d, 255]
   })
   // 10 cobblestone
   const ids: number[] = new Array(TILE * TILE).fill(0)
@@ -208,9 +208,9 @@ export function getAtlas() {
   })
   // 11 glass
   put(11, (x, y) => {
-    if (x === 0 || y === 0 || x === 15 || y === 15) return [205, 232, 238, 255]
+    if (x === 0 || y === 0 || x === 15 || y === 15) return [194, 216, 218, 255]
     if ((x === 3 && y === 3) || (x === 4 && y === 4) || (x === 3 && y === 5) || (x === 5 && y === 3))
-      return [240, 250, 252, 255]
+      return [226, 237, 235, 255]
     return [0, 0, 0, 0]
   })
 
@@ -297,6 +297,7 @@ class MeshData {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2))
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3))
     g.setIndex(new THREE.Uint32BufferAttribute(this.idx, 1))
+    g.computeVertexNormals()
     g.computeBoundingSphere()
     return g
   }
