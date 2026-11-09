@@ -16,6 +16,7 @@ type Props = {
   onSelect: (slot: number) => void
   onGive: (itemId: number, count: number) => void
   onRemove: (slot: number) => void
+  onMove: (from: number, to: number) => void
   onClose: () => void
 }
 
@@ -110,10 +111,11 @@ function ItemTexture({ name, className = 'h-8 w-8', fallbackSrc }: { name: strin
   />
 }
 
-export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, onGive, onRemove, onClose }: Props) {
+export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, onGive, onRemove, onMove, onClose }: Props) {
   const [category, setCategory] = useState<Category>('全部')
   const [query, setQuery] = useState('')
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null)
+  const [selectedBagSlot, setSelectedBagSlot] = useState<number | null>(null)
   const [, setAtlasVersion] = useState(0)
   useEffect(() => onAtlasReady(() => setAtlasVersion((version) => version + 1)), [])
   const categorized = useMemo(() => MINECRAFT_REGISTRY.items.map((item) => ({ item, category: categoryOf(item) })), [])
@@ -182,17 +184,30 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
 
         <div className="mt-3 mb-1 flex items-center justify-between">
           <strong className="text-sm">玩家背包 · 27 格</strong>
-          <span className="text-[11px] text-[#555]">点击方块可快捷装备；点击其他物品可移除整组</span>
+          <span className="text-[11px] text-[#555]">选择物品格，再点目标空格可移动、合并或交换；方块可直接装备</span>
         </div>
         <div className="grid grid-cols-9 gap-1">
           {bag.map((stack, i) => {
             const item = stack ? MINECRAFT_REGISTRY.items.find((entry) => entry.id === stack.itemId) : undefined
             const blockId = item ? BLOCK_ID_BY_NAME[item.name] : undefined
             return (
-              <button key={i} onClick={() => { if (stack && blockId !== undefined) onEquip(blockId); else if (stack) onRemove(i) }}
+              <button key={i} onClick={() => {
+                if (selectedBagSlot !== null) {
+                  if (selectedBagSlot !== i) onMove(selectedBagSlot, i)
+                  setSelectedBagSlot(null)
+                  return
+                }
+                if (stack && blockId !== undefined) {
+                  onEquip(blockId)
+                } else if (stack) {
+                  setSelectedBagSlot(i)
+                } else {
+                  setSelectedBagSlot(i)
+                }
+              }}
                 title={stack && item ? `${itemName(item)} × ${stack.count}` : `背包空格 ${i + 1}`}
                 aria-label={stack && item ? `${itemName(item)}，数量 ${stack.count}` : `背包空格 ${i + 1}`}
-                className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444]">
+                className={`relative aspect-square min-w-0 border-2 bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444] ${selectedBagSlot === i ? 'border-yellow-300 ring-2 ring-yellow-300' : 'border-[#555]'}`}>
                 {stack && item && <ItemTexture name={item.name} className="h-full w-full" fallbackSrc={blockId !== undefined ? blockIcon(blockId) : undefined} />}
                 {stack && <span className="absolute right-0 bottom-0 rounded-sm bg-black/75 px-1 text-[10px] font-bold text-white">{stack.count}</span>}
               </button>
@@ -200,6 +215,12 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
           })}
         </div>
 
+        {selectedBagSlot !== null && bag[selectedBagSlot] && (
+          <div className="mt-2 flex items-center justify-between gap-2 border-2 border-[#777] bg-[#b4b4b4] p-2 text-xs">
+            <span>已选中：{(() => { const entry = MINECRAFT_REGISTRY.items.find((x) => x.id === bag[selectedBagSlot]?.itemId); return entry ? `${itemName(entry)} × ${bag[selectedBagSlot]?.count}` : '未知物品' })()}</span>
+            <button onClick={() => { onRemove(selectedBagSlot); setSelectedBagSlot(null) }} className="min-h-9 border-2 border-[#333] bg-[#8b4141] px-3 text-white">丢弃整组</button>
+          </div>
+        )}
         <div className="mt-3 mb-1 text-sm font-bold">快捷栏 · 选择一个位置，再从物品栏放入方块</div>
         <div className="grid grid-cols-9 gap-1">
           {hotbar.map((id, i) => (
@@ -210,7 +231,7 @@ export default function Inventory({ selected, hotbar, bag, onEquip, onSelect, on
             </button>
           ))}
         </div>
-        <p className="mt-3 text-center text-[11px] text-[#444]">点击物品获取一组 · 方块可放入快捷栏 · 非方块物品目前作为背包道具收录 · 按 E 打开/关闭 · Esc 关闭</p>
+        <p className="mt-3 text-center text-[11px] text-[#444]">点击目录物品获取 · 背包物品可选择后移动到其他格 · 按 E 打开/关闭 · Esc 关闭</p>
       </section>
     </div>
   )
