@@ -22,18 +22,16 @@ export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose
           <h2 className="font-bold text-lg">物品栏</h2>
           <button className="border-2 border-[#333] bg-[#8b8b8b] px-3 py-1 text-white" onClick={onClose}>关闭 ×</button>
         </header>
-        <div className="mb-2 text-xs text-[#444]">物品栏 · 点击物品放入当前快捷栏位置</div>
+        <div className="mb-2 text-xs text-[#444]">可用方块 · 点击后放入当前选中的快捷栏位置</div>
         <div className="grid grid-cols-9 gap-1">
           {items.map((id, i) => (
             <button key={i} disabled={id === null} draggable={id !== null}
               onDragStart={(e) => { if (id !== null) e.dataTransfer.setData('text/plain', String(id)) }}
               onClick={() => { if (id !== null) onEquip(id) }}
-              onKeyDown={(e) => { if (id !== null && (e.key === 'Enter' || e.key === ' ')) onEquip(id) }}
-              title={id === null ? '空槽' : NAMES[id] || '方块'}
+              title={id === null ? '空槽' : NAMES[id] || '方块'} aria-label={id === null ? `背包空槽 ${i + 1}` : `${NAMES[id] || '方块'}，放入当前快捷栏槽位`}
               className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444] active:bg-[#aaa]">
               {id !== null && <>
                 <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
-                <span className="absolute right-1 bottom-0 text-[10px] font-bold text-white" style={{ textShadow: '1px 1px #222' }}>64</span>
               </>}
             </button>
           ))}
@@ -42,8 +40,8 @@ export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose
         <div className="grid grid-cols-9 gap-1">
           {hotbar.map((id, i) => (
             <button key={i} onClick={() => onSelect(i)} onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); const value = Number(e.dataTransfer.getData('text/plain')); if (Number.isInteger(value) && value > 0) { onSelect(i); onEquip(value, i) } }}
-              className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444]"
+              onDrop={(e) => { e.preventDefault(); const value = Number(e.dataTransfer.getData('text/plain')); if (HOTBAR.includes(value)) { onSelect(i); onEquip(value, i) } }}
+              aria-label={`快捷栏第 ${i + 1} 格：${NAMES[id] || '方块'}`} className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444]"
               style={i === selected ? { outline: '3px solid white', outlineOffset: '-3px' } : undefined}>
               <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full" style={{ imageRendering: 'pixelated' }} />
               <span className="absolute top-0 left-1 text-[9px] text-white">{i + 1}</span>
