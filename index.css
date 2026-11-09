@@ -137,6 +137,58 @@ body {
   right: calc(8px + env(safe-area-inset-right, 0px));
 }
 
+/* 背包入口：独立 Portal 到 body，避免被画布、触控视角区或菜单层遮挡。 */
+.inventory-launcher {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  z-index: 2147483000;
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 2px solid #000;
+  border-radius: 4px;
+  background: #707070;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,.4), inset -2px -2px 0 rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.55);
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.inventory-launcher:active { background: #8b8b8b; }
+.inventory-launcher:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+/* 物品栏在矮屏设备上可滚动，并避开刘海与圆角安全区。 */
+.inventory-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2147482990;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  background: rgba(0,0,0,.55);
+  pointer-events: auto;
+}
+.inventory-panel {
+  max-height: calc(100% - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+@media (max-height: 430px) {
+  .inventory-panel { max-height: calc(100% - 12px); }
+}
+
 /* ------------------------------ 触控按键(基岩版经典触控样式) ------------------------------ */
 
 .tc-root {
