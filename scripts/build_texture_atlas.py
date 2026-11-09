@@ -71,9 +71,102 @@ def fallback(name, face):
                 draw.point((x, y), fill=(220, 220, 220, 255))
     return image
 
-def pick(textures, name, face):
+def load_vanilla_model_resolver():
+    """Read 26.3 blockstate/model JSON from Mojang's client jar; only texture IDs are used."""
+    manifest = json.loads(get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"))
+    release = next((entry for entry in manifest["versions"] if entry.get("id") == "26.3"), None)
+    if release is None:
+        raise RuntimeError("Mojang version manifest does not contain Java 26.3")
+    version_json = json.loads(get(release["url"]))
+    client_url = version_json["downloads"]["client"]["url"]
+    jar = zipfile.ZipFile(io.BytesIO(get(client_url)))
+    model_cache = {}
+
+    def model_textures(model_id, stack=()):
+        if not model_id:
+            return {}
+        if ":" in model_id:
+            namespace, model_path = model_id.split(":", 1)
+        else:
+            namespace, model_path = "minecraft", model_id
+        if namespace != "minecraft":
+            return {}
+        key = f"{namespace}:{model_path}"
+        if key in model_cache:
+            return model_cache[key]
+        if key in stack:
+            return {}
+        file_path = f"assets/{namespace}/models/{model_path}.json"
+        try:
+            model = json.loads(jar.read(file_path))
+        except (KeyError, json.JSONDecodeError):
+            model_cache[key] = {}
+            return {}
+        inherited = model_textures(model.get("parent"), stack + (key,))
+        inherited.update(model.get("textures", {}))
+        model_cache[key] = inherited
+        return inherited
+
+    def resolve_ref(ref, textures):
+        visited = set()
+        while isinstance(ref, str) and ref.startswith("#"):
+            token = ref[1:]
+            if token in visited:
+                return None
+            visited.add(token)
+            ref = textures.get(token)
+        if not isinstance(ref, str):
+            return None
+        if ":" in ref:
+            namespace, path = ref.split(":", 1)
+            if namespace != "minecraft":
+                return None
+        else:
+            path = ref
+        if path.startswith("block/"):
+            return path[len("block/"):]
+        return None
+
+    def faces_for(block_name):
+        try:
+            state = json.loads(jar.read(f"assets/minecraft/blockstates/{block_name}.json"))
+        except (KeyError, json.JSONDecodeError):
+            return {}
+        model_ids = []
+        variants = state.get("variants")
+        if isinstance(variants, dict) and variants:
+            first = variants[sorted(variants.keys())[0]]
+            choices = first if isinstance(first, list) else [first]
+            model_ids.extend(choice.get("model") for choice in choices if isinstance(choice, dict))
+        multipart = state.get("multipart")
+        if isinstance(multipart, list):
+            for part in multipart:
+                apply = part.get("apply", {})
+                choices = apply if isinstance(apply, list) else [apply]
+                model_ids.extend(choice.get("model") for choice in choices if isinstance(choice, dict))
+        output = {}
+        for model_id in model_ids:
+            textures = model_textures(model_id)
+            for face, keys in {
+                "top": ("up", "top", "end", "all", "side", "front"),
+                "bottom": ("down", "bottom", "end", "all", "side", "front"),
+                "side": ("north", "side", "all", "front", "south", "east", "west"),
+            }.items():
+                if face in output:
+                    continue
+                for texture_key in keys:
+                    resolved = resolve_ref(textures.get(texture_key), textures)
+                    if resolved:
+                        output[face] = resolved
+                        break
+        return output
+
+    return faces_for
+
+
+def pick(textures, name, face, model_texture=None):
     suffixes = {"top": ("_top", "_end"), "bottom": ("_bottom", "_end"), "side": ("_side", "_front", "_all")}
-    aliases = [name]
+    aliases = [model_texture, name]
     # Wall-mounted variants reuse the corresponding standing block texture.
     aliases.append(name.replace("_wall_", "_"))
     if name.startswith("potted_"):
@@ -106,6 +199,7 @@ def pick(textures, name, face):
 def main():
     pack, version = find_pack()
     textures = load_textures(pack)
+    vanilla_faces = load_vanilla_model_resolver()
     if len(textures) < 80:
         raise RuntimeError(f"Texture pack extraction suspiciously small: {len(textures)} textures")
     atlas = Image.new("RGBA", (GRID * TILE, GRID * TILE), (0, 0, 0, 0))
@@ -132,7 +226,8 @@ def main():
     for index, block in enumerate(REGISTRY["blocks"]):
         name = block["name"]
         for face_index, face in enumerate(("top", "bottom", "side")):
-            image = pick(textures, name, face)
+            model_texture = vanilla_faces(name).get(face)
+            image = pick(textures, name, face, model_texture)
             if image is not None:
                 matched += 1
             else:
