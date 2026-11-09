@@ -71,6 +71,58 @@ def fallback(name, face):
                 draw.point((x, y), fill=(220, 220, 220, 255))
     return image
 
+def legacy_fallback(key):
+    """Use recognizable Minecraft-like colors when a pack omits a core legacy tile."""
+    palettes = {
+        "grass_block_top": ((92, 150, 62), "grass"),
+        "grass_block_side": ((126, 91, 55), "grass_side"),
+        "dirt": ((121, 85, 58), "dirt"),
+        "stone": ((126, 128, 130), "stone"),
+        "sand": ((218, 202, 145), "sand"),
+        "water_still": ((48, 105, 176), "water"),
+        "water_flow": ((48, 105, 176), "water"),
+        "oak_log": ((111, 78, 46), "wood"),
+        "oak_log_top": ((151, 119, 78), "rings"),
+        "oak_leaves": ((55, 133, 55), "leaves"),
+        "leaves": ((55, 133, 55), "leaves"),
+        "oak_planks": ((157, 119, 75), "planks"),
+        "cobblestone": ((119, 119, 119), "stone"),
+        "glass": ((180, 213, 218), "glass"),
+    }
+    base, pattern = palettes.get(key, ((120, 120, 120), "stone"))
+    image = Image.new("RGBA", (TILE, TILE), (*base, 255))
+    draw = ImageDraw.Draw(image)
+    if pattern in ("grass", "grass_side"):
+        for x in range(TILE):
+            for y in range(TILE):
+                if pattern == "grass" or y < 4:
+                    if (x * 7 + y * 11) % 9 < 3:
+                        draw.point((x, y), fill=(75, 126, 49, 255))
+                elif (x + y * 3) % 7 == 0:
+                    draw.point((x, y), fill=(91, 62, 39, 255))
+    elif pattern == "leaves":
+        for y in range(TILE):
+            for x in range(TILE):
+                if (x * 5 + y * 3) % 13 < 3:
+                    draw.point((x, y), fill=(35, 105, 42, 255))
+                elif (x * 2 + y) % 17 == 0:
+                    draw.point((x, y), fill=(108, 164, 64, 255))
+    elif pattern == "rings":
+        for y in range(TILE):
+            for x in range(TILE):
+                if max(abs(x - 7.5), abs(y - 7.5)) % 3 < 1:
+                    draw.point((x, y), fill=(177, 145, 99, 255))
+    elif pattern == "planks":
+        for y in (3, 7, 11, 15):
+            draw.line((0, y, 15, y), fill=(112, 82, 51, 255))
+    elif pattern == "glass":
+        draw.rectangle((0, 0, 15, 15), outline=(225, 240, 242, 255), width=2)
+        draw.line((3, 3, 7, 3), fill=(240, 248, 248, 255))
+    elif pattern == "stone":
+        for x in range(0, TILE, 4):
+            draw.line((x, 0, x, 15), fill=(105, 107, 109, 255))
+    return image
+
 def load_vanilla_model_resolver():
     """Read 26.3 blockstate/model JSON from Mojang's client jar; only texture IDs are used."""
     manifest = json.loads(get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"))
@@ -219,9 +271,21 @@ def main():
     # Legacy block tile IDs: 0 grass top, 1 grass side, 2 dirt, 3 stone, 4 sand,
     # 5 water, 6 oak log side, 7 oak log top, 8 leaves, 9 planks, 10 cobble, 11 glass.
     legacy_sources = ["grass_block_top","grass_block_side","dirt","stone","sand","water_still","oak_log","oak_log_top","oak_leaves","oak_planks","cobblestone","glass"]
+    legacy_aliases = {
+        "grass_block_top": ("grass_block_top", "grass_block"),
+        "grass_block_side": ("grass_block_side", "grass_side"),
+        "water_still": ("water_still", "water_still"),
+        "oak_leaves": ("oak_leaves", "leaves", "oak_leaves_opaque"),
+    }
     for index, key in enumerate(legacy_sources):
-        image = textures.get(key) or fallback("legacy_" + key, index % 3)
-        atlas.paste(image, ((index % GRID) * TILE, (index // GRID) * TILE), image)
+        candidates = legacy_aliases.get(key, (key,))
+        image = next((textures[candidate] for candidate in candidates if candidate in textures), None)
+        if image is None:
+            image = legacy_fallback(key)
+            print(f"Core texture missing: {key}; using semantic fallback")
+        # Do not use the image as its own paste mask: that multiplies alpha twice
+        # and makes transparent foliage/item edges unexpectedly dark.
+        atlas.paste(image, ((index % GRID) * TILE, (index // GRID) * TILE))
     matched = 0
     for index, block in enumerate(REGISTRY["blocks"]):
         name = block["name"]
@@ -233,7 +297,7 @@ def main():
             else:
                 image = fallback(name, face_index)
             tile = 12 + index * 3 + face_index
-            atlas.paste(image, ((tile % GRID) * TILE, (tile // GRID) * TILE), image)
+            atlas.paste(image, ((tile % GRID) * TILE, (tile // GRID) * TILE))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     atlas.save(OUT, optimize=True)
     shutil.copyfile(ROOT / "TEXTURE_CREDITS.md", CREDITS_OUT)
