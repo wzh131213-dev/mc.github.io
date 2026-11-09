@@ -16,10 +16,10 @@ const NAMES: Record<number, string> = {
 export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose }: Props) {
   const items: number[] = [...BLOCKS]
   return (
-    <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-3" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <section className="w-[min(560px,96vw)] border-4 border-[#242424] bg-[#c6c6c6] p-3 text-[#202020] shadow-[0_8px_32px_#0009]" aria-label="背包物品栏">
+    <div className="inventory-overlay" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <section className="inventory-panel w-[min(560px,96vw)] border-4 border-[#242424] bg-[#c6c6c6] p-3 text-[#202020] shadow-[0_8px_32px_#0009]" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
         <header className="mb-3 flex items-center justify-between">
-          <h2 className="font-bold text-lg">物品栏</h2>
+          <h2 id="inventory-title" className="font-bold text-lg">物品栏</h2>
           <button className="border-2 border-[#333] bg-[#8b8b8b] px-3 py-1 text-white" onClick={onClose}>关闭 ×</button>
         </header>
         <div className="mb-2 text-xs text-[#444]">全部可用方块 · 共 {BLOCKS.length} 种 · 点击后放入当前选中的快捷栏位置</div>
