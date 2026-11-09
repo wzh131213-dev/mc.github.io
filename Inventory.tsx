@@ -3,7 +3,7 @@ import { HOTBAR, blockIcon } from './world'
 type Props = {
   selected: number
   hotbar: number[]
-  onEquip: (blockId: number) => void
+  onEquip: (blockId: number, targetSlot?: number) => void
   onSelect: (slot: number) => void
   onClose: () => void
 }
@@ -42,7 +42,7 @@ export default function Inventory({ selected, hotbar, onEquip, onSelect, onClose
         <div className="grid grid-cols-9 gap-1">
           {hotbar.map((id, i) => (
             <button key={i} onClick={() => onSelect(i)} onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); const value = Number(e.dataTransfer.getData('text/plain')); if (Number.isInteger(value) && value > 0) { onSelect(i); onEquip(value) } }}
+              onDrop={(e) => { e.preventDefault(); const value = Number(e.dataTransfer.getData('text/plain')); if (Number.isInteger(value) && value > 0) { onSelect(i); onEquip(value, i) } }}
               className="relative aspect-square min-w-0 border-2 border-[#555] bg-[#8b8b8b] p-1 shadow-[inset_2px_2px_0_#eee,inset_-2px_-2px_0_#444]"
               style={i === selected ? { outline: '3px solid white', outlineOffset: '-3px' } : undefined}>
               <img src={blockIcon(id)} alt={NAMES[id] || '方块'} className="h-full w-full" style={{ imageRendering: 'pixelated' }} />
