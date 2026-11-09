@@ -4,34 +4,25 @@ import { readFile } from 'node:fs/promises'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-test('every registered block has a texture tile and a display name', async () => {
+test('all registered blocks have a generated icon path and a data-driven display name', async () => {
   const world = await read('world.ts')
-  const inventory = await read('Inventory.tsx')
-  const constants = new Map(
-    [...world.matchAll(/^export const ([A-Z_]+) = (\d+)$/gm)].map((m) => [m[1], Number(m[2])]),
-  )
-  const blockList = world.match(/export const BLOCKS = \[([^\]]+)\]/)
-  assert.ok(blockList, 'BLOCKS registry must exist')
-  const blockNames = blockList[1].split(',').map((s) => s.trim()).filter(Boolean)
-  const tileSection = world.slice(world.indexOf('const BLOCK_TILES'), world.indexOf('// blocks that hide'))
-  const nameSection = inventory.match(/const NAMES: Record<number, string> = \{([\s\S]*?)\n\}/)
-  assert.ok(nameSection, 'Inventory must define block labels')
-  const namedIds = new Set([...nameSection[1].matchAll(/(\d+)\s*:/g)].map((m) => Number(m[1])))
-
-  for (const blockName of blockNames) {
-    const id = constants.get(blockName)
-    assert.notEqual(id, undefined, `missing numeric ID for ${blockName}`)
-    assert.ok(tileSection.includes(`[${blockName}]:`), `missing atlas tile for ${blockName}`)
-    assert.ok(namedIds.has(id), `missing inventory name for block ID ${id}`)
-  }
+  const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
+  assert.match(world, /BLOCK_LABELS = new Map/)
+  assert.match(world, /getGenericTile\(blockId: number\)/)
+  assert.match(world, /BLOCK_TILES\[b\] \?\? \[getGenericTile/)
+  assert.match(world, /BLOCK_META_BY_ID/)
+  assert.equal(registry.blocks.length, 1285)
+  assert.ok(registry.blocks.every((block) => typeof block.name === 'string' && typeof block.displayName === 'string'))
 })
 
-test('inventory UI renders the registered block list instead of a stale hard-coded subset', async () => {
+test('inventory UI renders the complete searchable item registry instead of a hard-coded block subset', async () => {
   const inventory = await read('Inventory.tsx')
-  assert.match(inventory, /const items: number\[\] = \[\.\.\.BLOCKS\]/)
-  assert.match(inventory, /items\.map\(/)
+  assert.match(inventory, /MINECRAFT_REGISTRY\.items\.map/)
+  assert.match(inventory, /visibleItems\.map/)
   assert.match(inventory, /role="dialog"/)
   assert.match(inventory, /aria-modal="true"/)
+  assert.match(inventory, /onGive/)
+  assert.match(inventory, /bag\.map/)
 })
 
 test('inventory launcher is mounted above the game layers and remains available while paused', async () => {
@@ -62,7 +53,7 @@ test('invalid block IDs are rejected before mutating chunk data', async () => {
   const write = setBody[1].indexOf('c.data[')
   assert.notEqual(validation, -1, 'World.set must validate IDs')
   assert.ok(validation < write, 'validation must occur before the typed-array write')
-  assert.match(world, /const OCC = new Uint8Array\(256\)/)
+  assert.match(world, /const OCC = new Uint8Array\(8192\)/)
 })
 
 test('Pages deployment refuses to publish the uncompiled branch source', async () => {
