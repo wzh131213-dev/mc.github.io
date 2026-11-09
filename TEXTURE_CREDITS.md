@@ -10,3 +10,5 @@ The block texture atlas is built during GitHub Actions from **Fresh Textures**, 
 The build script downloads the 26.3-compatible archive, verifies its published SHA-512 hash, reads block textures, resizes them to 16×16 atlas cells, and creates a per-block atlas. Missing texture names receive deterministic generated fallback pixels; they are not represented as original pack artwork.
 
 The game code, world registry, and generated fallback textures are separate from the Fresh Textures artwork. The atlas is rebuilt during deployment and is not committed as a binary asset.
+
+The atlas builder also reads blockstate/model references from the official Mojang 26.3 client archive to resolve which texture belongs on each block face. Those model files are used transiently for mapping only and are not included in the deployed site.
