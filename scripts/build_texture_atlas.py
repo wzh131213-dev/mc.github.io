@@ -166,7 +166,7 @@ def load_vanilla_model_resolver():
 
 def pick(textures, name, face, model_texture=None):
     suffixes = {"top": ("_top", "_end"), "bottom": ("_bottom", "_end"), "side": ("_side", "_front", "_all")}
-    aliases = [model_texture, name]
+    aliases = ([model_texture] if model_texture else []) + [name]
     # Wall-mounted variants reuse the corresponding standing block texture.
     aliases.append(name.replace("_wall_", "_"))
     if name.startswith("potted_"):
