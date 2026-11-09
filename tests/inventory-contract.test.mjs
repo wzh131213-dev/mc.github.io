@@ -103,3 +103,38 @@ test('hotbar layout survives reload and save failures are shown to the player', 
   assert.match(app, /eng\?\.saveWorld\(\)/)
   assert.match(app, /本地存储不可用：当前世界修改可能无法保存/)
 })
+
+
+test('Minecraft 26.3 catalog contains the complete published item and block registries', async () => {
+  const registry = JSON.parse(await read('minecraft-26.3-registry.json'))
+  assert.equal(registry.version, '26.3')
+  assert.equal(registry.items.length, 1657)
+  assert.equal(registry.blocks.length, 1285)
+  assert.ok(registry.items.some((item) => item.name === 'diamond_sword'))
+  assert.ok(registry.items.some((item) => item.name === 'poplar_boat'))
+  assert.ok(registry.items.some((item) => item.name === 'abandoned_camp_map'))
+  assert.ok(registry.blocks.some((block) => block.name === 'poplar_log'))
+  assert.ok(registry.blocks.some((block) => block.name === 'straw_bed'))
+  assert.ok(registry.blocks.some((block) => block.name === 'white_cushion'))
+})
+
+test('all 26.3 placeable block registry entries have stable internal IDs and 16-bit chunk storage', async () => {
+  const world = await read('world.ts')
+  assert.match(world, /import MINECRAFT_REGISTRY from '\.\/minecraft-26\.3-registry\.json'/)
+  assert.match(world, /BLOCK_ID_BY_NAME/)
+  assert.match(world, /EXTRA_BLOCK_ID_BASE/)
+  assert.match(world, /new Uint16Array\(CS \* CS \* SY\)/)
+  assert.match(world, /new Uint8Array\(8192\)/)
+  assert.match(world, /MINECRAFT_REGISTRY\.blocks/)
+  assert.match(world, /boundingBox/)
+})
+
+test('creative inventory browses the full item catalog with search and category filters', async () => {
+  const inventory = await read('Inventory.tsx')
+  assert.match(inventory, /MINECRAFT_REGISTRY\.items/)
+  assert.match(inventory, /search/)
+  assert.match(inventory, /category/)
+  assert.match(inventory, /全部/)
+  assert.match(inventory, /1657|itemCount/)
+  assert.match(inventory, /BLOCK_ID_BY_NAME/)
+})
