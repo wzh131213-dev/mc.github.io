@@ -204,3 +204,13 @@ test('deployment builds the licensed 26.3 texture atlas before Vite packaging', 
   assert.ok(workflow.includes('pip install --disable-pip-version-check pillow'))
   assert.ok(workflow.includes('Build Vite application'))
 })
+
+test('core texture atlas fallbacks preserve recognizable block colors and PNG alpha', async () => {
+  const builder = await read('scripts/build_texture_atlas.py')
+  assert.match(builder, /def legacy_fallback\(key\)/)
+  assert.match(builder, /"oak_leaves": \(\(55, 133, 55\), "leaves"\)/)
+  assert.match(builder, /"grass_block_top": \(\(92, 150, 62\), "grass"\)/)
+  assert.match(builder, /atlas\.paste\(image, \(\(index % GRID\) \* TILE, \(index \/\/ GRID\) \* TILE\)\)/)
+  assert.doesNotMatch(builder, /atlas\.paste\(image, \(\(index % GRID\) \* TILE, \(index \/\/ GRID\) \* TILE\), image\)/)
+  assert.doesNotMatch(builder, /atlas\.paste\(image, \(\(tile % GRID\) \* TILE, \(tile \/\/ GRID\) \* TILE\), image\)/)
+})
