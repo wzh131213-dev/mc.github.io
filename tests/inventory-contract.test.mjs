@@ -276,3 +276,18 @@ test('starting the game never forces fullscreen or locks screen orientation', as
   assert.doesNotMatch(app, /requestFullscreen|enterFullscreen|orientation\.lock/)
   assert.match(app, /const startGame = \(\) => \{[\s\S]*?go\('loading'\)/)
 })
+
+
+test('game engine includes animated block-style farm animals and disposes their scene resources', async () => {
+  const animals = await read('Animals.ts')
+  const engine = await read('engine.ts')
+  for (const kind of ['cow', 'pig', 'sheep', 'chicken']) assert.ok(animals.includes(`'${kind}'`))
+  assert.match(animals, /new THREE\.BoxGeometry/)
+  assert.match(animals, /spawnNear\(x: number, z: number\)/)
+  assert.match(animals, /this\.world\.get\(px, ground, pz\) !== GRASS/)
+  assert.match(animals, /leg\.rotation\.x/)
+  assert.match(engine, /new AnimalManager\(this\.scene, this\.world\)/)
+  assert.match(engine, /this\.animals\.spawnNear\(s\.x, s\.z\)/)
+  assert.match(engine, /this\.animals\.update\(dt, this\.time\)/)
+  assert.match(engine, /this\.animals\.dispose\(\)/)
+})
