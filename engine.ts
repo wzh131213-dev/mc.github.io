@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { AnimalManager } from './Animals'
+import { MonsterManager } from './Monsters'
 import { AIR, CS, HOTBAR, SY, WATER, World, ckey, getAtlasTexture, getWorld, valueNoise } from './world'
 
 export interface Settings {
@@ -54,6 +55,7 @@ export class Engine {
   private camera: THREE.PerspectiveCamera
   private world: World
   private animals: AnimalManager
+  private monsters: MonsterManager
   private chunks = new Map<number, ChunkMesh>()
   private frustum = new THREE.Frustum()
   private projMat = new THREE.Matrix4()
@@ -106,6 +108,7 @@ export class Engine {
     this.canvas = canvas
     this.world = getWorld()
     this.animals = new AnimalManager(this.scene, this.world)
+    this.monsters = new MonsterManager(this.scene, this.world)
 
     this.touchMode = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -292,6 +295,7 @@ export class Engine {
       this.pitch = 0
       this.spawned = true
       this.animals.spawnNear(s.x, s.z)
+      this.monsters.spawnNear(s.x, s.z)
     }
     if (m === 'panorama') this.outline.visible = false
     this.applyFog()
@@ -404,6 +408,7 @@ export class Engine {
     })
     this.chunks.clear()
     this.animals.dispose()
+    this.monsters.dispose()
     this.renderer.dispose()
   }
 
@@ -866,6 +871,7 @@ export class Engine {
     this.last = t
     this.time += dt
     this.animals.update(dt, this.time)
+    this.monsters.update(dt, this.time)
 
     if (this.mode === 'panorama') this.updatePanorama(dt)
     else if (this.active) this.updateGame(dt)
