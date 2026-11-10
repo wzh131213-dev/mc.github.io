@@ -7,7 +7,7 @@ type AnimalKind =
   | 'fish' | 'squid' | 'dolphin' | 'turtle' | 'frog' | 'tadpole'
   | 'bee' | 'bat' | 'parrot' | 'polar_bear' | 'goat' | 'sniffer'
 type Animal = {
-  group: THREE.Group; legs: THREE.Group[]; head: THREE.Group
+  kind: AnimalKind; group: THREE.Group; legs: THREE.Group[]; head: THREE.Group
   phase: number; speed: number; direction: number; turnAt: number; baseY: number
 }
 
@@ -160,7 +160,7 @@ export class AnimalManager {
           const baseY = ground + (kind === 'tadpole' ? 0.2 : 0.55)
           model.group.position.set(px + 0.5, baseY, pz + 0.5)
           this.scene.add(model.group)
-          this.animals.push({ ...model, phase: waterPlaced * 1.7, speed: 0.35, direction: angle, turnAt: 2 + waterPlaced, baseY })
+          this.animals.push({ ...model, kind, phase: waterPlaced * 1.7, speed: 0.35, direction: angle, turnAt: 2 + waterPlaced, baseY })
           waterPlaced++
           continue
         }
@@ -173,7 +173,7 @@ export class AnimalManager {
         const direction = angle + Math.PI
         model.group.rotation.y = direction
         this.scene.add(model.group)
-        this.animals.push({ ...model, phase: landPlaced * 1.7, speed: 0.45 + (landPlaced % 3) * 0.12, direction, turnAt: 3 + landPlaced, baseY })
+        this.animals.push({ ...model, kind, phase: landPlaced * 1.7, speed: 0.45 + (landPlaced % 3) * 0.12, direction, turnAt: 3 + landPlaced, baseY })
         landPlaced++
       }
     }
@@ -184,7 +184,7 @@ export class AnimalManager {
       const walking = Math.sin(elapsed * animal.speed + animal.phase)
       animal.head.rotation.x = Math.sin(elapsed * 1.4 + animal.phase) * 0.07
       animal.legs.forEach((leg, index) => { leg.rotation.x = walking * (index % 2 ? -0.34 : 0.34) })
-      animal.group.position.y = animal.baseY + (FLYING.has(this.kindForAnimal(animal)) ? Math.sin(elapsed * 2 + animal.phase) * 0.16 : Math.sin(elapsed * 2 + animal.phase) * 0.0008)
+      animal.group.position.y = animal.baseY + (FLYING.has(animal.kind) ? Math.sin(elapsed * 2 + animal.phase) * 0.16 : Math.sin(elapsed * 2 + animal.phase) * 0.0008)
       animal.turnAt -= dt
       if (animal.turnAt <= 0) {
         animal.direction += Math.sin(elapsed + animal.phase) * 0.55
@@ -192,11 +192,6 @@ export class AnimalManager {
         animal.turnAt = 3 + (animal.phase % 4)
       }
     }
-  }
-
-  private kindForAnimal(animal: Animal): AnimalKind {
-    const index = this.animals.indexOf(animal)
-    return this.kinds[index % this.kinds.length]
   }
 
   dispose() {
