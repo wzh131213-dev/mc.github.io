@@ -309,3 +309,11 @@ test('expanded animal roster includes land, aquatic and flying species with wate
   assert.match(animals, /landKinds\[Math\.abs\(px \* 31 \+ pz \* 17\) % landKinds\.length\]/)
   assert.match(animals, /node\.geometry\.dispose\(\)/)
 })
+
+
+test('touch and desktop rendering use sharp high-DPI output with antialiasing', async () => {
+  const engine = await read('engine.ts')
+  assert.match(engine, /new THREE\.WebGLRenderer\(\{ canvas, antialias: true \}\)/)
+  assert.match(engine, /setPixelRatio\(Math\.min\(window\.devicePixelRatio \|\| 1, 2\)\)/)
+  assert.doesNotMatch(engine, /touchMode \? 1\.35/)
+})
