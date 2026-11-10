@@ -108,9 +108,9 @@ export class Engine {
     this.animals = new AnimalManager(this.scene, this.world)
 
     this.touchMode = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.touchMode })
-    // 移动端采用较低阴影贴图和像素比,避免高分辨率设备过度消耗 GPU
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.touchMode ? 1.35 : 1.75))
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    // 使用设备原生高 DPI 输出,最高 2 倍;保留像素贴图的最近邻采样风格
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.12
@@ -418,6 +418,8 @@ export class Engine {
   private resize = () => {
     const w = this.canvas.clientWidth || window.innerWidth
     const h = this.canvas.clientHeight || window.innerHeight
+    // 屏幕 DPI 或浏览器缩放变化时同步更新缓冲区分辨率
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     this.renderer.setSize(w, h, false)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
