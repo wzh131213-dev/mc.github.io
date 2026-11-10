@@ -291,3 +291,20 @@ test('game engine includes animated block-style farm animals and disposes their 
   assert.match(engine, /this\.animals\.update\(dt, this\.time\)/)
   assert.match(engine, /this\.animals\.dispose\(\)/)
 })
+
+
+test('expanded animal roster includes land, aquatic and flying species with water-aware spawning', async () => {
+  const animals = await read('Animals.ts')
+  const kinds = [
+    'wolf', 'cat', 'rabbit', 'fox', 'panda', 'horse', 'donkey', 'mule', 'llama', 'camel',
+    'fish', 'squid', 'dolphin', 'turtle', 'frog', 'tadpole',
+    'bee', 'bat', 'parrot', 'polar_bear', 'goat', 'sniffer',
+  ]
+  for (const kind of kinds) assert.ok(animals.includes(`'${kind}'`), `missing animal: ${kind}`)
+  assert.match(animals, /const AQUATIC = new Set/)
+  assert.match(animals, /const FLYING = new Set/)
+  assert.match(animals, /this\.world\.get\(px, ground, pz\) === WATER/)
+  assert.match(animals, /animal\.baseY \+ /)
+  assert.match(animals, /kind: AnimalKind/)
+  assert.match(animals, /node\.geometry\.dispose\(\)/)
+})
