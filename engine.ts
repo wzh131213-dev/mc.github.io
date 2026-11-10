@@ -118,7 +118,8 @@ export class Engine {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.12
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    // PCFSoftShadowMap was removed in recent Three.js releases.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.camera = new THREE.PerspectiveCamera(85, 1, 0.05, 1500)
     this.camera.rotation.order = 'YXZ'
 

@@ -310,19 +310,37 @@ export function getAtlas() {
   // 图集由构建工作流从带明确再分发许可的 26.3 资源包生成；本地开发无图集时保留独立备用纹理。
   if (!atlasLoadStarted) {
     atlasLoadStarted = true
-    const image = new Image()
-    image.onload = () => {
-      const context = c.getContext('2d')
-      if (!context) return
-      context.clearRect(0, 0, c.width, c.height)
-      context.drawImage(image, 0, 0, c.width, c.height)
-      atlasLoaded = true
-      if (atlasTex) atlasTex.needsUpdate = true
-      iconCache.clear()
-      atlasReadyListeners.forEach((listener) => listener())
-    }
-    image.onerror = () => { atlasLoadStarted = false }
-    image.src = new URL('vanilla-block-atlas.png', document.baseURI).toString()
+    const atlasUrl = new URL('vanilla-block-atlas.png', document.baseURI).toString()
+    fetch(atlasUrl)
+      .then((response) => {
+        const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+        if (!response.ok || !contentType.startsWith('image/')) return null
+        return response.blob()
+      })
+      .then((blob) => {
+        if (!blob) {
+          atlasLoadStarted = false
+          return
+        }
+        const image = new Image()
+        image.onload = () => {
+          const context = c.getContext('2d')
+          if (!context) return
+          context.clearRect(0, 0, c.width, c.height)
+          context.drawImage(image, 0, 0, c.width, c.height)
+          URL.revokeObjectURL(image.src)
+          atlasLoaded = true
+          if (atlasTex) atlasTex.needsUpdate = true
+          iconCache.clear()
+          atlasReadyListeners.forEach((listener) => listener())
+        }
+        image.onerror = () => {
+          URL.revokeObjectURL(image.src)
+          atlasLoadStarted = false
+        }
+        image.src = URL.createObjectURL(blob)
+      })
+      .catch(() => { atlasLoadStarted = false })
   }
   return c
 }
