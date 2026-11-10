@@ -166,7 +166,8 @@ export class AnimalManager {
         }
         if (landPlaced >= 8 || this.world.get(px, ground, pz) !== GRASS) continue
         if (this.world.get(px, ground + 1, pz) !== 0 || this.world.get(px, ground + 2, pz) !== 0) continue
-        kind = this.kinds.filter((candidate) => !AQUATIC.has(candidate))[landPlaced % (this.kinds.length - AQUATIC.size)]
+        const landKinds = this.kinds.filter((candidate) => !AQUATIC.has(candidate))
+        kind = landKinds[Math.abs(px * 31 + pz * 17) % landKinds.length]
         const model = buildAnimal(kind)
         const baseY = ground + 1
         model.group.position.set(px + 0.5, baseY, pz + 0.5)
