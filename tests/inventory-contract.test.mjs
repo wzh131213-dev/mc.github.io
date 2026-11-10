@@ -306,5 +306,6 @@ test('expanded animal roster includes land, aquatic and flying species with wate
   assert.match(animals, /this\.world\.get\(px, ground, pz\) === WATER/)
   assert.match(animals, /animal\.baseY \+ /)
   assert.match(animals, /kind: AnimalKind/)
+  assert.match(animals, /landKinds\[Math\.abs\(px \* 31 \+ pz \* 17\) % landKinds\.length\]/)
   assert.match(animals, /node\.geometry\.dispose\(\)/)
 })
