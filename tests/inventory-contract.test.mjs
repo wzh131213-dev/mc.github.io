@@ -23,7 +23,7 @@ test('the nine-slot hotbar remains visible, selectable and persisted', async () 
   assert.match(app, /hotbarBlocks\.map\(/)
   assert.match(app, /blockIcon\(b\)/)
   assert.match(engine, /hotbar = \[\.\.\.HOTBAR\]/)
-  assert.match(engine, /selectSlot\(index: number\)/)
+  assert.match(engine, /selectSlot\(i: number\)/)
   assert.match(world, /export const HOTBAR = \[/)
 })
 
