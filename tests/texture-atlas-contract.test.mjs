@@ -10,7 +10,7 @@ test('vanilla model resolver chooses a canonical default state instead of the al
   assert.match(builder, /axis=y/)
   assert.match(builder, /facing=north/)
   assert.match(builder, /half=lower/)
-  assert.match(builder, /variants\.get\(""\)/)
+  assert.match(builder, /if "" in variants/)
 })
 
 test('atlas model resolver maps actual element face textures and inherits parent model elements', async () => {
