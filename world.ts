@@ -443,13 +443,6 @@ export function ckey(cx: number, cz: number) {
   return ((cx & 0xffff) << 16) | (cz & 0xffff)
 }
 
-function hash3(x: number, y: number, z: number, seed: number) {
-  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 1274126177) ^ Math.imul(seed, 1442695041)
-  h = Math.imul(h ^ (h >>> 13), 1274126177)
-  h ^= h >>> 16
-  return (h >>> 0) / 4294967296
-}
-
 function combineFaceGeometry(parts: MeshData[]) {
   const geometry = new THREE.BufferGeometry()
   const positions: number[] = []
@@ -490,7 +483,6 @@ export class Chunk {
   ) {}
 }
 
-const TREE_MARGIN = 2
 const WORLD_SAVE_PREFIX = 'mc-web-world:v1:'
 
 export class World {
@@ -576,12 +568,6 @@ export class World {
     return Math.max(3, Math.min(SY - 10, Math.floor(h)))
   }
 
-  /** 该列是否长树,返回树干高度(0 = 没树)。同样是纯函数,跨区块的树因此能完整拼合 */
-  private treeAt(x: number, z: number, h: number) {
-    if (h <= SEA + 1 || h >= 43) return 0
-    if (hash2(x, z, this.seed + 9) > 0.011) return 0
-    return 4 + Math.floor(hash2(x, z, this.seed + 10) * 2)
-  }
 
   private generateChunk(cx: number, cz: number) {
     // 当前版本保留世界/渲染接口，但不再生成地形、树木、水体或任何方块。
