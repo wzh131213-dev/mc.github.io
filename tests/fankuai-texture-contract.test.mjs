@@ -25,3 +25,21 @@ test('fankuai resolves each cardinal model face independently instead of collaps
   assert.match(builder, /"east"/)
   assert.match(builder, /"west"/)
 })
+
+
+test('runtime renders chunk-batched solid blocks with six independent directional materials', async () => {
+  const engine = await read('engine.ts')
+  const world = await read('world.ts')
+  assert.match(engine, /BLOCK_FACE_ORDER = \['east', 'west', 'top', 'bottom', 'south', 'north'\]/)
+  assert.match(engine, /fankuai\/blocks\/\$\{encodeURIComponent\(name\)\}\/\$\{face\}\.png/)
+  assert.match(engine, /new THREE\.Mesh\(geometry, getBlockFaceMaterials\(blockId\)\)/)
+  assert.match(world, /opaqueByBlock = new Map<number, MeshData\[\]\(\)/)
+  assert.match(world, /Array\.from\(\{ length: 6 \}, \(\) => new MeshData\(\)\)/)
+  assert.match(world, /const md = isWater \? water : blockFaces!\[faceIndex\]/)
+})
+
+test('inventory icons load standalone PNGs from the fankuai items directory', async () => {
+  const inventory = await read('Inventory.tsx')
+  assert.match(inventory, /new URL\('fankuai\/items\/', document\.baseURI\)/)
+  assert.match(inventory, /itemTextureName\(name\)/)
+})
