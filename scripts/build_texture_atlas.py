@@ -1,0 +1,415 @@
+#!/usr/bin/env python3
+"""Build block and item textures from InventivetalentDev Minecraft Java 26.3 assets."""
+import hashlib
+import io
+import json
+import math
+import shutil
+import urllib.parse
+import urllib.request
+import zipfile
+from pathlib import Path
+from PIL import Image, ImageDraw
+
+ROOT = Path(__file__).resolve().parents[1]
+REGISTRY = json.loads((ROOT / "minecraft-26.3-registry.json").read_text(encoding="utf-8"))
+OUT = ROOT / "public" / "vanilla-block-atlas.png"
+CREDITS_OUT = ROOT / "public" / "TEXTURE_CREDITS.md"
+TILE = 16
+GRID = math.ceil(math.sqrt(12 + len(REGISTRY["blocks"]) * 3))
+HEADERS = {"User-Agent": "mc.github.io texture-atlas-builder/1.0"}
+
+def get(url):
+    req = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=90) as response:
+        return response.read()
+
+def load_textures(texture_root):
+    """Load exact vanilla 26.3 block PNGs from InventivetalentDev/minecraft-assets."""
+    block_root = Path(texture_root) / "block"
+    if not block_root.is_dir():
+        raise RuntimeError(f"Missing vanilla block texture directory: {block_root}")
+    result = {}
+    for path in block_root.rglob("*.png"):
+        key = path.relative_to(block_root).with_suffix("").as_posix()
+        try:
+            image = Image.open(path).convert("RGBA")
+            result[key] = image.resize((TILE, TILE), Image.Resampling.NEAREST)
+        except Exception as exc:
+            print(f"Skipping unreadable texture {path}: {exc}")
+    return result
+
+def legacy_fallback(key):
+    """Use recognizable Minecraft-like colors when a pack omits a core legacy tile."""
+    palettes = {
+        "grass_block_top": ((92, 150, 62), "grass"),
+        "grass_block_side": ((126, 91, 55), "grass_side"),
+        "dirt": ((121, 85, 58), "dirt"),
+        "stone": ((126, 128, 130), "stone"),
+        "sand": ((218, 202, 145), "sand"),
+        "water_still": ((48, 105, 176), "water"),
+        "water_flow": ((48, 105, 176), "water"),
+        "oak_log": ((111, 78, 46), "wood"),
+        "oak_log_top": ((151, 119, 78), "rings"),
+        "oak_leaves": ((55, 133, 55), "leaves"),
+        "leaves": ((55, 133, 55), "leaves"),
+        "oak_planks": ((157, 119, 75), "planks"),
+        "cobblestone": ((119, 119, 119), "stone"),
+        "glass": ((180, 213, 218), "glass"),
+    }
+    base, pattern = palettes.get(key, ((120, 120, 120), "stone"))
+    image = Image.new("RGBA", (TILE, TILE), (*base, 255))
+    draw = ImageDraw.Draw(image)
+    if pattern in ("grass", "grass_side"):
+        for x in range(TILE):
+            for y in range(TILE):
+                if pattern == "grass" or y < 4:
+                    if (x * 7 + y * 11) % 9 < 3:
+                        draw.point((x, y), fill=(75, 126, 49, 255))
+                elif (x + y * 3) % 7 == 0:
+                    draw.point((x, y), fill=(91, 62, 39, 255))
+    elif pattern == "leaves":
+        for y in range(TILE):
+            for x in range(TILE):
+                if (x * 5 + y * 3) % 13 < 3:
+                    draw.point((x, y), fill=(35, 105, 42, 255))
+                elif (x * 2 + y) % 17 == 0:
+                    draw.point((x, y), fill=(108, 164, 64, 255))
+    elif pattern == "rings":
+        for y in range(TILE):
+            for x in range(TILE):
+                if max(abs(x - 7.5), abs(y - 7.5)) % 3 < 1:
+                    draw.point((x, y), fill=(177, 145, 99, 255))
+    elif pattern == "planks":
+        for y in (3, 7, 11, 15):
+            draw.line((0, y, 15, y), fill=(112, 82, 51, 255))
+    elif pattern == "glass":
+        draw.rectangle((0, 0, 15, 15), outline=(225, 240, 242, 255), width=2)
+        draw.line((3, 3, 7, 3), fill=(240, 248, 248, 255))
+    elif pattern == "stone":
+        for x in range(0, TILE, 4):
+            draw.line((x, 0, x, 15), fill=(105, 107, 109, 255))
+    return image
+
+def fallback(name, face_index):
+    """Deterministic per-block fallback when the vanilla model texture cannot be resolved."""
+    digest = hashlib.sha256(f"{name}:{face_index}".encode("utf-8")).digest()
+    base = tuple(48 + value % 160 for value in digest[:3])
+    image = Image.new("RGBA", (TILE, TILE), (*base, 255))
+    draw = ImageDraw.Draw(image)
+    accent = tuple(min(255, value + 38) for value in base) + (255,)
+    shadow = tuple(max(0, value - 38) for value in base) + (255,)
+    for y in range(TILE):
+        for x in range(TILE):
+            if (x * (digest[3] % 7 + 2) + y * (digest[4] % 9 + 2) + digest[5]) % 13 < 3:
+                draw.point((x, y), fill=accent)
+            elif (x + y + digest[6]) % 11 == 0:
+                draw.point((x, y), fill=shadow)
+    # A subtle face-specific pattern makes top/bottom/side fallback tiles distinct.
+    if face_index == 0:
+        draw.rectangle((1, 1, 14, 14), outline=accent, width=1)
+    elif face_index == 1:
+        draw.line((0, 4, 15, 4), fill=shadow, width=2)
+        draw.line((0, 11, 15, 11), fill=accent, width=1)
+    else:
+        draw.line((4, 0, 4, 15), fill=shadow, width=1)
+        draw.line((11, 0, 11, 15), fill=accent, width=1)
+    return image
+
+def load_vanilla_model_resolver():
+    """Resolve the canonical block model's actual face textures from the 26.3 client jar."""
+    manifest = json.loads(get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"))
+    release = next((entry for entry in manifest["versions"] if entry.get("id") == "26.3"), None)
+    if release is None:
+        raise RuntimeError("Mojang version manifest does not contain Java 26.3")
+    version_json = json.loads(get(release["url"]))
+    client_url = version_json["downloads"]["client"]["url"]
+    jar = zipfile.ZipFile(io.BytesIO(get(client_url)))
+    model_cache = {}
+    face_cache = {}
+
+    def read_model(model_id):
+        if not model_id:
+            return {}
+        if ":" in model_id:
+            namespace, model_path = model_id.split(":", 1)
+        else:
+            namespace, model_path = "minecraft", model_id
+        if namespace != "minecraft":
+            return {}
+        try:
+            return json.loads(jar.read(f"assets/{namespace}/models/{model_path}.json"))
+        except (KeyError, json.JSONDecodeError):
+            return {}
+
+    def model_textures(model_id, stack=()):
+        if not model_id:
+            return {}
+        key = model_id if ":" in model_id else f"minecraft:{model_id}"
+        if key in model_cache:
+            return model_cache[key]
+        if key in stack:
+            return {}
+        model = read_model(key)
+        inherited = dict(model_textures(model.get("parent"), stack + (key,)))
+        inherited.update(model.get("textures", {}))
+        model_cache[key] = inherited
+        return inherited
+
+    def model_face_textures(model_id, stack=()):
+        """Return texture references by geometric face, preserving child texture overrides."""
+        if not model_id:
+            return {}
+        key = model_id if ":" in model_id else f"minecraft:{model_id}"
+        if key in face_cache:
+            return face_cache[key]
+        if key in stack:
+            return {}
+        model = read_model(key)
+        inherited_faces = model_face_textures(model.get("parent"), stack + (key,))
+        parent_faces = {name: list(value) if name == "sides" else value for name, value in inherited_faces.items()}
+        elements = model.get("elements")
+        if isinstance(elements, list):
+            for element in elements:
+                faces = element.get("faces", {})
+                if not isinstance(faces, dict):
+                    continue
+                for direction, face_data in faces.items():
+                    if not isinstance(face_data, dict) or not isinstance(face_data.get("texture"), str):
+                        continue
+                    if direction == "up":
+                        parent_faces["top"] = face_data["texture"]
+                    elif direction == "down":
+                        parent_faces["bottom"] = face_data["texture"]
+                    elif direction in ("north", "south", "east", "west"):
+                        parent_faces.setdefault("sides", []).append(face_data["texture"])
+                    elif direction == "all":
+                        parent_faces["top"] = parent_faces["bottom"] = face_data["texture"]
+                        parent_faces.setdefault("sides", []).append(face_data["texture"])
+        face_cache[key] = parent_faces
+        return parent_faces
+
+    def resolve_ref(ref, textures):
+        visited = set()
+        while isinstance(ref, str) and ref.startswith("#"):
+            token = ref[1:]
+            if token in visited:
+                return None
+            visited.add(token)
+            ref = textures.get(token)
+        if not isinstance(ref, str):
+            return None
+        if ":" in ref:
+            namespace, path = ref.split(":", 1)
+            if namespace != "minecraft":
+                return None
+        else:
+            path = ref
+        return path[len("block/"):] if path.startswith("block/") else None
+
+    def choose_default_variant(variants):
+        """Prefer vanilla's neutral/default state, never arbitrary alphabetical state."""
+        if "" in variants:
+            return variants[""]
+        preferred = {
+            "axis": "y", "facing": "north", "half": "lower", "hinge": "left",
+            "part": "single", "type": "bottom", "age": "0", "stage": "0",
+            "lit": "false", "open": "false", "powered": "false",
+            "waterlogged": "false", "persistent": "false", "snowy": "false",
+            "attached": "false", "berries": "false", "rotation": "0",
+            "moisture": "0", "note": "0", "pickles": "1", "eggs": "1",
+        }
+        def score(key):
+            states = {}
+            for pair in key.split(","):
+                if "=" in pair:
+                    name, value = pair.split("=", 1)
+                    states[name.strip()] = value.strip()
+            return sum(states.get(name) == value for name, value in preferred.items())
+        return variants[max(sorted(variants), key=score)]
+
+    def faces_for(block_name):
+        try:
+            state = json.loads(jar.read(f"assets/minecraft/blockstates/{block_name}.json"))
+        except (KeyError, json.JSONDecodeError):
+            return {}
+        model_ids = []
+        variants = state.get("variants")
+        if isinstance(variants, dict) and variants:
+            selected = choose_default_variant(variants)
+            choices = selected if isinstance(selected, list) else [selected]
+            model_ids.extend(choice.get("model") for choice in choices if isinstance(choice, dict))
+        multipart = state.get("multipart")
+        if isinstance(multipart, list) and not model_ids:
+            for part in multipart:
+                apply = part.get("apply", {})
+                choices = apply if isinstance(apply, list) else [apply]
+                model_ids.extend(choice.get("model") for choice in choices if isinstance(choice, dict))
+
+        output = {}
+        side_candidates = []
+        for model_id in model_ids:
+            textures = model_textures(model_id)
+            refs = model_face_textures(model_id)
+            # Parent models without explicit elements still expose conventional texture slots.
+            if not refs:
+                refs = {
+                    "top": textures.get("up") or textures.get("top") or textures.get("end") or textures.get("all"),
+                    "bottom": textures.get("down") or textures.get("bottom") or textures.get("end") or textures.get("all"),
+                    "sides": [textures.get("side") or textures.get("all") or textures.get("front")],
+                }
+            for face in ("top", "bottom"):
+                resolved = resolve_ref(refs.get(face), textures)
+                if resolved and face not in output:
+                    output[face] = resolved
+            for ref in refs.get("sides", []):
+                resolved = resolve_ref(ref, textures)
+                if resolved:
+                    side_candidates.append(resolved)
+        if side_candidates:
+            # Directional blocks often have a unique front texture; a cube has one side
+            # texture, so use the most common side face instead of accidentally using north/front.
+            counts = {}
+            for value in side_candidates:
+                counts[value] = counts.get(value, 0) + 1
+            output["side"] = max(sorted(counts), key=lambda value: counts[value])
+        return output
+
+    return faces_for
+
+
+SPECIAL_TEXTURE_ALIASES = {
+    "lava": {"top": ("lava_still", "lava_flow"), "bottom": ("lava_still",), "side": ("lava_still", "lava_flow")},
+    "fire": {"top": ("fire_0", "fire_1"), "bottom": ("fire_0", "fire_1"), "side": ("fire_0", "fire_1")},
+    "soul_fire": {"top": ("soul_fire_0", "soul_fire_1"), "bottom": ("soul_fire_0",), "side": ("soul_fire_0", "soul_fire_1")},
+    "moving_piston": {"top": ("piston_top",), "bottom": ("piston_bottom",), "side": ("piston_side",)},
+    "glass_pane": {"top": ("glass_pane_top",), "bottom": ("glass_pane_top",), "side": ("glass_pane_top",)},
+    "wheat": {"top": ("wheat_stage0",), "bottom": ("wheat_stage0",), "side": ("wheat_stage0",)},
+    "carrots": {"top": ("carrots_stage0",), "bottom": ("carrots_stage0",), "side": ("carrots_stage0",)},
+    "potatoes": {"top": ("potatoes_stage0",), "bottom": ("potatoes_stage0",), "side": ("potatoes_stage0",)},
+    "end_portal": {"top": ("nether_portal",), "bottom": ("nether_portal",), "side": ("nether_portal",)},
+}
+
+def pick(textures, name, face, model_texture=None):
+    for alias in SPECIAL_TEXTURE_ALIASES.get(name, {}).get(face, ()):
+        if alias in textures:
+            return textures[alias]
+    if name.startswith("waxed_"):
+        unwaxed = name[len("waxed_"):]
+        if unwaxed in textures:
+            return textures[unwaxed]
+    suffixes = {"top": ("_top", "_end"), "bottom": ("_bottom", "_end"), "side": ("_side", "_front", "_all")}
+    aliases = ([model_texture] if model_texture else []) + [name]
+    # Wall-mounted variants reuse the corresponding standing block texture.
+    aliases.append(name.replace("_wall_", "_"))
+    if name.startswith("potted_"):
+        aliases.append(name[len("potted_"):])
+    # Strip the longest suffix first so oak_wall_sign does not become oak_wall.
+    suffixes_to_strip = (
+        "_wall_hanging_sign", "_wall_coral_fan", "_wall_banner", "_wall_head",
+        "_wall_skull", "_wall_torch", "_wall_sign", "_hanging_sign", "_standing_sign",
+        "_fence_gate", "_pressure_plate", "_trapdoor", "_stairs", "_slab", "_fence",
+        "_button", "_door", "_sign", "_head", "_skull", "_banner", "_bed", "_carpet",
+        "_coral_fan", "_wall",
+    )
+    for alias in tuple(aliases):
+        base = alias
+        for suffix in suffixes_to_strip:
+            if base.endswith(suffix):
+                base = base[:-len(suffix)]
+                break
+        aliases.extend((base, base + "_planks", base + "_log", base + "_block", base.replace("_block", "")))
+    seen = set()
+    for alias in aliases:
+        if not alias or alias in seen:
+            continue
+        seen.add(alias)
+        for candidate in tuple(alias + suffix for suffix in suffixes[face]) + (alias,):
+            if candidate in textures:
+                return textures[candidate]
+    return None
+
+def main():
+    texture_root = Path(__import__("os").environ.get("MINECRAFT_TEXTURES_DIR", ROOT / "assets" / "minecraft" / "textures"))
+    textures = load_textures(texture_root)
+    version = "26.3"
+    vanilla_faces = load_vanilla_model_resolver()
+    if len(textures) < 80:
+        raise RuntimeError(f"Texture pack extraction suspiciously small: {len(textures)} textures")
+    atlas = Image.new("RGBA", (GRID * TILE, GRID * TILE), (0, 0, 0, 0))
+    # Stable legacy tiles keep existing worlds visually consistent.
+    legacy = [
+        ("grass_block_top", "grass_block_side", "dirt"),
+        ("dirt", "dirt", "dirt"),
+        ("stone", "stone", "stone"),
+        ("sand", "sand", "sand"),
+        ("water_still", "water_still", "water_flow"),
+        ("oak_log_top", "oak_log", "oak_log_top"),
+        ("oak_leaves", "oak_leaves", "oak_leaves"),
+        ("oak_planks", "oak_planks", "oak_planks"),
+        ("cobblestone", "cobblestone", "cobblestone"),
+        ("glass", "glass", "glass"),
+    ]
+    # Legacy block tile IDs: 0 grass top, 1 grass side, 2 dirt, 3 stone, 4 sand,
+    # 5 water, 6 oak log side, 7 oak log top, 8 leaves, 9 planks, 10 cobble, 11 glass.
+    legacy_sources = ["grass_block_top","grass_block_side","dirt","stone","sand","water_still","oak_log","oak_log_top","oak_leaves","oak_planks","cobblestone","glass"]
+    legacy_aliases = {
+        "grass_block_top": ("grass_block_top", "grass_block"),
+        "grass_block_side": ("grass_block_side", "grass_side"),
+        "water_still": ("water_still", "water_still"),
+        "oak_leaves": ("oak_leaves", "leaves", "oak_leaves_opaque"),
+    }
+    for index, key in enumerate(legacy_sources):
+        candidates = legacy_aliases.get(key, (key,))
+        image = next((textures[candidate] for candidate in candidates if candidate in textures), None)
+        if image is None:
+            image = legacy_fallback(key)
+            print(f"Core texture missing: {key}; using semantic fallback")
+        # Do not use the image as its own paste mask: that multiplies alpha twice
+        # and makes transparent foliage/item edges unexpectedly dark.
+        atlas.paste(image, ((index % GRID) * TILE, (index // GRID) * TILE))
+    matched = 0
+    unmapped_blocks = []
+    for index, block in enumerate(REGISTRY["blocks"]):
+        name = block["name"]
+        for face_index, face in enumerate(("top", "bottom", "side")):
+            model_texture = vanilla_faces(name).get(face)
+            image = pick(textures, name, face, model_texture)
+            if image is not None:
+                matched += 1
+            else:
+                unmapped_blocks.append(f"{name}:{face}")
+                image = fallback(name, face_index)
+            tile = 12 + index * 3 + face_index
+            atlas.paste(image, ((tile % GRID) * TILE, (tile // GRID) * TILE))
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    atlas.save(OUT, optimize=True)
+    item_root = texture_root / "item"
+    item_out = ROOT / "public" / "minecraft-item-textures"
+    if not item_root.is_dir():
+        raise RuntimeError(f"Missing vanilla item texture directory: {item_root}")
+    if item_out.exists():
+        shutil.rmtree(item_out)
+    shutil.copytree(item_root, item_out)
+    item_count = sum(1 for path in item_out.rglob("*.png"))
+    shutil.copyfile(ROOT / "TEXTURE_CREDITS.md", CREDITS_OUT)
+    print(f"InventivetalentDev minecraft-assets {version}: {len(textures)} vanilla block textures; {item_count} item textures")
+    total_faces = len(REGISTRY["blocks"]) * 3
+    fallback_count = len(unmapped_blocks)
+    report = {
+        "minecraft_version": version,
+        "block_count": len(REGISTRY["blocks"]),
+        "total_faces": total_faces,
+        "matched_faces": matched,
+        "fallback_count": fallback_count,
+        "fallback_ratio": round(fallback_count / total_faces, 4) if total_faces else 0,
+        "unmapped_blocks": unmapped_blocks,
+    }
+    (ROOT / "public" / "texture-atlas-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Mapped {matched}/{total_faces} block faces from vanilla model references")
+    if unmapped_blocks:
+        print("Unmapped block textures ({} faces using fallback): {}".format(fallback_count, ", ".join(unmapped_blocks[:60])))
+    print(f"Atlas: {OUT} ({atlas.width}x{atlas.height})")
+
+if __name__ == "__main__":
+    main()

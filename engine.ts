@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { AnimalManager } from './Animals'
+import { MonsterManager } from './Monsters'
 import { AIR, CS, HOTBAR, SY, WATER, World, ckey, getAtlasTexture, getWorld, valueNoise } from './world'
 
 export interface Settings {
@@ -52,6 +54,8 @@ export class Engine {
   private scene = new THREE.Scene()
   private camera: THREE.PerspectiveCamera
   private world: World
+  private animals: AnimalManager
+  private monsters: MonsterManager
   private chunks = new Map<number, ChunkMesh>()
   private frustum = new THREE.Frustum()
   private projMat = new THREE.Matrix4()
@@ -103,6 +107,8 @@ export class Engine {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
     this.world = getWorld()
+    this.animals = new AnimalManager(this.scene, this.world)
+    this.monsters = new MonsterManager(this.scene, this.world)
 
     this.touchMode = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.touchMode })
@@ -259,6 +265,11 @@ export class Engine {
 
   /* ---------------------------- public API --------------------------- */
 
+  /** 将已修改区块的存档写入浏览器本地存储。 */
+  saveWorld() {
+    return this.world.save()
+  }
+
   setSettings(s: Settings) {
     this.settings = s
     this.applyFog()
@@ -394,6 +405,8 @@ export class Engine {
       c.water?.geometry.dispose()
     })
     this.chunks.clear()
+    this.animals.dispose()
+    this.monsters.dispose()
     this.renderer.dispose()
   }
 
@@ -620,7 +633,8 @@ export class Engine {
 
   /** 对准星指向的方块执行破坏 / 放置,成功返回 true */
   private act(kind: 'break' | 'place'): boolean {
-    const hit = this.raycast(6)
+    // 破坏时允许命中水方块；放置时仍把水视为可替换空间。
+    const hit = this.raycast(6, kind === 'break')
     if (!hit) return false
     if (kind === 'break') {
       if (hit.y === 0) return false
@@ -650,7 +664,7 @@ export class Engine {
     return true
   }
 
-  private raycast(maxD: number) {
+  private raycast(maxD: number, includeWater = false) {
     const o = new THREE.Vector3(this.pos.x, this.pos.y + this.eye, this.pos.z)
     const d = new THREE.Vector3()
     this.camera.getWorldDirection(d)
@@ -672,7 +686,7 @@ export class Engine {
     let nz = 0
     while (t <= maxD) {
       const b = this.world.get(x, y, z)
-      if (b !== AIR && b !== WATER) return { x, y, z, nx, ny, nz, b }
+      if (b !== AIR && (includeWater || b !== WATER)) return { x, y, z, nx, ny, nz, b }
       if (tmx < tmy && tmx < tmz) {
         x += sx
         t = tmx
@@ -852,6 +866,8 @@ export class Engine {
     const dt = Math.min(0.05, (t - this.last) / 1000 || 0.016)
     this.last = t
     this.time += dt
+    this.animals.update(dt, this.time)
+    this.monsters.update(dt, this.time)
 
     if (this.mode === 'panorama') this.updatePanorama(dt)
     else if (this.active) this.updateGame(dt)

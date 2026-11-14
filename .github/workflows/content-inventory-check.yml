@@ -1,0 +1,43 @@
+name: Game integration checks
+
+on:
+  push:
+    branches:
+      - feature/rendering-lighting-shadows-materials
+      - feature/vanilla-content-inventory-mobs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Dependency security audit
+        run: npm audit --audit-level=low
+      - name: Validate texture atlas builder syntax
+        run: python -m py_compile scripts/build_texture_atlas.py scripts/build_fankuai_textures.py
+      - name: Inventory and world regression tests
+        run: npm test
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Production build
+        run: npm run build
+      - name: Verify generated page
+        run: |
+          test -s dist/index.html
+          if grep -qE 'src="/main\\.tsx"|src="/main\\.jsx"' dist/index.html; then
+            echo "Uncompiled TypeScript entry found"
+            exit 1
+          fi
+          echo "Game integration build verified"

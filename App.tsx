@@ -4,9 +4,25 @@ import { Engine } from './engine'
 import type { InfoPayload, Settings } from './engine'
 import Logo from './Logo'
 import TouchControls from './TouchControls'
-import { HOTBAR, blockIcon, dirtDataURL } from './world'
+import { BLOCKS, HOTBAR, blockIcon, dirtDataURL } from './world'
 
 type Screen = 'title' | 'options' | 'multi' | 'loading' | 'playing' | 'paused' | 'quit'
+
+const HOTBAR_STORAGE_KEY = 'mc-web-hotbar:v1'
+function readSavedHotbar(): number[] {
+  try {
+    const raw = window.localStorage.getItem(HOTBAR_STORAGE_KEY)
+    const value: unknown = raw ? JSON.parse(raw) : null
+    if (
+      Array.isArray(value) &&
+      value.length === 9 &&
+      value.every((id) => Number.isInteger(id) && BLOCKS.includes(id as (typeof BLOCKS)[number]))
+    ) return value as number[]
+  } catch {
+    // 浏览器隐私模式可能禁用本地存储；回退到默认快捷栏。
+  }
+  return [...HOTBAR]
+}
 
 const SPLASHES = [
   '你好,世界!',
@@ -27,22 +43,6 @@ const SPLASHES = [
 const TIPS = 'WASD 移动 · 空格 跳跃(双击飞行) · Shift 疾跑 · 左键 破坏 · 右键 放置 · 1-9 / 滚轮 切换方块 · Esc 菜单'
 const TIPS_TOUCH =
   '左下十字键 移动(连点两下 ↑ 疾跑) · 屏幕上滑动 转视角 · 轻点 放置方块 · 长按 破坏方块 · 连点两下跳跃键 飞行 · 点快捷栏切换方块'
-
-/** 尝试进入全屏并锁定横屏(Android Chrome 等支持;iOS Safari 会静默忽略) */
-function enterFullscreen() {
-  try {
-    const el = document.documentElement
-    if (document.fullscreenElement || !el.requestFullscreen) return
-    Promise.resolve(el.requestFullscreen({ navigationUI: 'hide' }))
-      .then(() => {
-        const o = screen.orientation as unknown as { lock?: (o: string) => Promise<void> }
-        return o.lock?.('landscape')
-      })
-      .catch(() => {})
-  } catch {
-    /* 忽略 */
-  }
-}
 
 function McButton({
   children,
@@ -130,6 +130,8 @@ export default function App() {
     chunks: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 6 : 8,
   }))
   const [slot, setSlot] = useState(0)
+  const [hotbarBlocks] = useState<number[]>(readSavedHotbar)
+  const [saveWarning, setSaveWarning] = useState(false)
   const [info, setInfo] = useState<InfoPayload>({ text: '', chunkText: '', underwater: false, fly: false })
   const [touch, setTouch] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -149,7 +151,8 @@ export default function App() {
     engine.onTouchMode = setTouch
     setTouch(engine.touchMode)
     engine.onLockChange = (locked) => {
-      if (!locked && screenRef.current === 'playing') go('paused')
+      if (locked) return
+      if (screenRef.current === 'playing') go('paused')
     }
     return () => {
       engine.dispose()
@@ -160,6 +163,26 @@ export default function App() {
   useEffect(() => {
     engineRef.current?.setSettings(settings)
   }, [settings])
+
+  useEffect(() => {
+    if (engineRef.current) engineRef.current.hotbar = [...hotbarBlocks]
+  }, [hotbarBlocks])
+
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem('mc-web-inventory:v1')
+    } catch {
+      // Ignore unavailable browser storage.
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(HOTBAR_STORAGE_KEY, JSON.stringify(hotbarBlocks))
+    } catch {
+      setSaveWarning(true)
+    }
+  }, [hotbarBlocks])
 
   // iOS Safari 忽略 user-scalable=no,需要拦截捏合手势
   useEffect(() => {
@@ -172,14 +195,16 @@ export default function App() {
     }
   }, [])
 
-  // Esc handling when pointer lock isn't available
+  // Esc 仅用于暂停菜单，不再打开或关闭背包。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Escape') return
       const s = screenRef.current
       const eng = engineRef.current
-      if (s === 'playing') go('paused')
-      else if (s === 'paused') {
+      if (s === 'playing') {
+        if (eng && !eng.touchMode && !eng.noLock) return
+        go('paused')
+      } else if (s === 'paused') {
         eng?.lock()
         go('playing')
       } else if (s === 'options') go(optionsFrom.current)
@@ -210,8 +235,8 @@ export default function App() {
   }, [screen, go])
 
   const startGame = () => {
+    setSaveWarning(false)
     engineRef.current?.lock()
-    if (engineRef.current?.touchMode) enterFullscreen()
     go('loading')
   }
 
@@ -221,8 +246,10 @@ export default function App() {
   }
 
   const toTitle = () => {
-    go('title')
     const eng = engineRef.current
+    // 区块修改在每次操作时已自动保存；退出时再统一写入并检查存储状态。
+    setSaveWarning(!(eng?.saveWorld() ?? false))
+    go('title')
     eng?.unlock()
     eng?.setMode('panorama')
   }
@@ -256,22 +283,30 @@ export default function App() {
               className="mc-text -mt-1 self-end pr-[4%] text-[clamp(12px,1.6vw,18px)] font-bold tracking-[0.3em] italic"
               style={{ color: '#e6e6e6' }}
             >
-              WEB EDITION
+              网页版本
             </div>
           </div>
+
+          {saveWarning && (
+            <div role="status" className="mc-text absolute top-2 max-w-[92vw] rounded border border-[#b88632] bg-black/80 px-3 py-2 text-center text-sm text-[#ffd77a]">
+              本地存储不可用：当前世界修改可能无法保存
+            </div>
+          )}
 
           <div className="relative mt-[5vh] flex w-[min(400px,90vw)] flex-col gap-2">
             <McButton onClick={startGame}>单人游戏</McButton>
             <McButton onClick={() => go('multi')}>多人游戏</McButton>
-            <McButton disabled>Minecraft Realms</McButton>
+            <McButton disabled>领域服务器</McButton>
             <div className="mt-4 flex gap-2 [@media(max-height:440px)]:mt-0">
               <McButton onClick={() => openOptions('title')}>选项...</McButton>
               <McButton onClick={() => go('quit')}>退出游戏</McButton>
             </div>
           </div>
 
-          <div className="mc-text safe-bl absolute text-[15px]">Minecraft 1.20.4</div>
-          <div className="mc-text safe-br absolute text-[15px]">版权所有 Mojang AB,请勿散布!</div>
+          <p className="mc-text mt-4 mb-10 max-w-[min(560px,92vw)] px-3 text-center text-[11px] leading-relaxed text-white/90 [text-shadow:1px_1px_2px_#000]">
+            Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
+          </p>
+          <div className="mc-text safe-bl absolute text-[15px]">我的世界 Java 版 26.3</div>
         </div>
       )}
 
@@ -283,11 +318,11 @@ export default function App() {
             <div className="flex items-center gap-3 border-2 border-transparent p-2 hover:border-[#9a9a9a]">
               <img src={blockIcon(1)} alt="" className="h-16 w-16" style={{ imageRendering: 'pixelated' }} />
               <div className="flex-1">
-                <div className="mc-text text-[18px]">Minecraft 服务器</div>
+                <div className="mc-text text-[18px]">我的世界服务器</div>
                 <div className="text-[16px] text-[#ff5555]" style={{ textShadow: '2px 2px 0 #3f1515' }}>
                   无法连接到服务器
                 </div>
-                <div className="text-[14px] text-[#a0a0a0]">localhost:25565</div>
+                <div className="text-[14px] text-[#a0a0a0]">本地地址：25565</div>
               </div>
               <div className="mr-2 flex items-end gap-[2px]">
                 {[8, 12, 16, 20, 24].map((h) => (
@@ -374,7 +409,7 @@ export default function App() {
         <div className="pointer-events-none absolute inset-0 z-10">
           {info.underwater && <div className="absolute inset-0 bg-[#1b4fd6]/35" />}
           <div className="mc-text safe-tl absolute text-[14px] leading-5">
-            <div>Minecraft 1.20.4 (web/vanilla)</div>
+            <div>我的世界 Java 版 26.3（网页原版模式）</div>
             <div>{info.text}</div>
             <div>{info.chunkText}</div>
           </div>
@@ -394,7 +429,7 @@ export default function App() {
               } as CSSProperties
             }
           >
-            {HOTBAR.map((b, i) => (
+            {hotbarBlocks.map((b, i) => (
               <div
                 key={i}
                 className={`hotbar-slot relative flex h-[var(--slot)] w-[var(--slot)] items-center justify-center bg-[#8b8b8b] ${touch ? 'pointer-events-auto touch-none' : ''}`}

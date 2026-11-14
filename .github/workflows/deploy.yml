@@ -2,13 +2,14 @@ name: Build and deploy Minecraft web app
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/vanilla-content-inventory-mobs"]
     paths-ignore:
       - ".github/workflows/unzip-upload.yml"
+      - "public/fankuai/**"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -18,10 +19,20 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Verify GitHub Pages uses the Actions source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pages_source="$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type')"
+          if [ "$pages_source" != "workflow" ]; then
+            echo "::error title=GitHub Pages source mismatch::Set Settings > Pages > Build and deployment > Source to GitHub Actions. Branch/Jekyll publishing sends uncompiled main.tsx to the browser."
+            exit 1
+          fi
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
@@ -29,19 +40,54 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Fetch exact Minecraft 26.3 textures from InventivetalentDev
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --filter=blob:none --sparse --branch 26.3 https://github.com/InventivetalentDev/minecraft-assets.git /tmp/minecraft-assets
+          git -C /tmp/minecraft-assets sparse-checkout set assets/minecraft/textures
+          test -s /tmp/minecraft-assets/assets/minecraft/textures/block/oak_leaves.png
+          test -s /tmp/minecraft-assets/assets/minecraft/textures/item/diamond.png
+      - name: Build vanilla 26.3 block and item textures
+        env:
+          MINECRAFT_TEXTURES_DIR: /tmp/minecraft-assets/assets/minecraft/textures
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python scripts/build_texture_atlas.py
+          python scripts/build_fankuai_textures.py
+      - name: Commit fankuai assets to the current branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f public/fankuai
+          if git diff --cached --quiet; then
+            echo "fankuai assets already match the branch"
+          else
+            git commit -m "Add generated Minecraft 26.3 fankuai textures"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Verify persisted texture directory
+        run: |
+          test -s public/fankuai/manifest.json
+          test -s public/fankuai/blocks/grass_block/top.png
+          test -s public/fankuai/items/diamond.png
+          echo "Persisted fankuai files: $(find public/fankuai -type f | wc -l)"
       - name: Build Vite application
         run: npm run build
       - name: Verify build output
         run: |
           test -s dist/index.html
-          if grep -qE 'src="/main\.tsx"|src="/main\.jsx"' dist/index.html; then
+          test -s dist/fankuai/manifest.json
+          test -s dist/fankuai/blocks/grass_block/top.png
+          test -s dist/fankuai/items/diamond.png
+          if grep -qE 'src="/main\\.tsx"|src="/main\\.jsx"' dist/index.html; then
             echo "Uncompiled TSX entry found in dist/index.html"
             exit 1
           fi
           echo "Vite output verified:"
           ls -lah dist
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -54,4 +100,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
