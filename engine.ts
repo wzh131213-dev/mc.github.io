@@ -683,37 +683,8 @@ export class Engine {
 
   /** 对准星指向的方块执行破坏 / 放置,成功返回 true */
   private act(_kind: 'break' | 'place'): boolean {
-    // 空世界版本只保留快捷栏显示与切换，不允许重新破坏/放置方块。
+    // 空世界版本仅保留快捷栏展示和切换，不允许破坏或放置方块。
     return false
-    // 原有方块交互逻辑保留在 Git 历史中，不在此版本启用。
-    const hit = this.raycast(6, kind === 'break')
-    if (!hit) return false
-    if (kind === 'break') {
-      if (hit.y === 0) return false
-      this.world.set(hit.x, hit.y, hit.z, AIR)
-      this.rebuildAround(hit.x, hit.z)
-      return true
-    }
-    const px = hit.x + hit.nx
-    const py = hit.y + hit.ny
-    const pz = hit.z + hit.nz
-    if (py < 0 || py >= SY) return false
-    const cur = this.world.get(px, py, pz)
-    if (cur !== AIR && cur !== WATER) return false
-    // don't place inside the player
-    const hw = PLAYER_W / 2
-    if (
-      px + 1 > this.pos.x - hw &&
-      px < this.pos.x + hw &&
-      pz + 1 > this.pos.z - hw &&
-      pz < this.pos.z + hw &&
-      py + 1 > this.pos.y &&
-      py < this.pos.y + PLAYER_H
-    )
-      return false
-    this.world.set(px, py, pz, this.hotbar[this.slot])
-    this.rebuildAround(px, pz)
-    return true
   }
 
   private raycast(maxD: number, includeWater = false) {
