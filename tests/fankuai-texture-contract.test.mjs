@@ -27,7 +27,7 @@ test('fankuai resolves each cardinal model face independently instead of collaps
 })
 
 
-test('runtime renders chunk-batched solid blocks with six independent directional materials', async () => {
+test('the game runtime has returned to the original atlas and ten-block palette', async () => {
   const engine = await read('engine.ts')
   const world = await read('world.ts')
   assert.match(engine, /BLOCK_FACE_ORDER = \['east', 'west', 'top', 'bottom', 'south', 'north'\]/)
