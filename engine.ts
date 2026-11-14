@@ -333,11 +333,10 @@ export class Engine {
       const s = this.world.findSpawn()
       this.pos.set(s.x, s.y, s.z)
       this.vel.set(0, 0, 0)
+      this.fly = true
       this.yaw = 0.6
       this.pitch = 0
       this.spawned = true
-      this.animals.spawnNear(s.x, s.z)
-      this.monsters.spawnNear(s.x, s.z)
     }
     if (m === 'panorama') this.outline.visible = false
     this.applyFog()
@@ -683,8 +682,10 @@ export class Engine {
   }
 
   /** 对准星指向的方块执行破坏 / 放置,成功返回 true */
-  private act(kind: 'break' | 'place'): boolean {
-    // 破坏时允许命中水方块；放置时仍把水视为可替换空间。
+  private act(_kind: 'break' | 'place'): boolean {
+    // 空世界版本只保留快捷栏显示与切换，不允许重新破坏/放置方块。
+    return false
+    // 原有方块交互逻辑保留在 Git 历史中，不在此版本启用。
     const hit = this.raycast(6, kind === 'break')
     if (!hit) return false
     if (kind === 'break') {
