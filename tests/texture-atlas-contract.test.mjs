@@ -48,3 +48,13 @@ test('legacy core block textures are resolved from their exact vanilla model fac
   assert.match(builder, /"stone"/)
   assert.match(builder, /"dirt"/)
 })
+
+
+test('atlas dimensions scale to fit all three face tiles for every registered block', async () => {
+  const builder = await read('scripts/build_texture_atlas.py')
+  const world = await read('world.ts')
+  assert.match(builder, /GRID = math\.ceil\(math\.sqrt\(12 \+ len\(REGISTRY\["blocks"\]\) \* 3\)\)/)
+  assert.match(world, /const TILE_COUNT = Math\.ceil\(Math\.sqrt\(12 \+ MINECRAFT_REGISTRY\.blocks\.length \* 3\)\)/)
+  assert.doesNotMatch(builder, /GRID = 64/)
+  assert.doesNotMatch(world, /const TILE_COUNT = 64/)
+})
