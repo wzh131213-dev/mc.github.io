@@ -51,10 +51,8 @@ test('legacy core block textures are resolved from their exact vanilla model fac
 
 
 test('runtime keeps the original sixteen-tile atlas for the original block set', async () => {
-  const builder = await read('scripts/build_texture_atlas.py')
   const world = await read('world.ts')
-  assert.match(builder, /GRID = math\.ceil\(math\.sqrt\(12 \+ len\(REGISTRY\["blocks"\]\) \* 3\)\)/)
-  assert.match(world, /const TILE_COUNT = Math\.ceil\(Math\.sqrt\(12 \+ MINECRAFT_REGISTRY\.blocks\.length \* 3\)\)/)
-  assert.doesNotMatch(builder, /GRID = 64/)
-  assert.doesNotMatch(world, /const TILE_COUNT = 64/)
+  assert.match(world, /const TILE_COUNT = 16/)
+  assert.doesNotMatch(world, /MINECRAFT_REGISTRY|Math\\.sqrt\\(12/)
+  assert.match(world, /export const BLOCKS = \\[GRASS, DIRT, STONE, SAND, WATER, LOG, LEAVES, PLANKS, COBBLE, GLASS\\] as const/)
 })
