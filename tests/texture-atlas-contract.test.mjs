@@ -7,9 +7,9 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 test('vanilla model resolver chooses a canonical default state instead of the alphabetically first variant', async () => {
   const builder = await read('scripts/build_texture_atlas.py')
   assert.match(builder, /def choose_default_variant\(variants\)/)
-  assert.match(builder, /axis=y/)
-  assert.match(builder, /facing=north/)
-  assert.match(builder, /half=lower/)
+  assert.match(builder, /"axis": "y"/)
+  assert.match(builder, /"facing": "north"/)
+  assert.match(builder, /"half": "lower"/)
   assert.match(builder, /if "" in variants/)
 })
 
