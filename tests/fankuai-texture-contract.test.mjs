@@ -27,15 +27,13 @@ test('fankuai resolves each cardinal model face independently instead of collaps
 })
 
 
-test('the game runtime has returned to the original atlas and ten-block palette', async () => {
+test('runtime uses the original atlas and does not load expanded fankuai blocks', async () => {
   const engine = await read('engine.ts')
   const world = await read('world.ts')
-  assert.match(engine, /BLOCK_FACE_ORDER = \['east', 'west', 'top', 'bottom', 'south', 'north'\]/)
-  assert.match(engine, /fankuai\/blocks\/\$\{encodeURIComponent\(name\)\}\/\$\{face\}\.png/)
-  assert.match(engine, /new THREE\.Mesh\(geometry, getBlockFaceMaterials\(blockId\)\)/)
-  assert.match(world, /opaqueByBlock = new Map<number, MeshData\[\]>\(\)/)
-  assert.match(world, /Array\.from\(\{ length: 6 \}, \(\) => new MeshData\(\)\)/)
-  assert.match(world, /const md = isWater \? water : blockFaces!\[faceIndex\]/)
+  assert.doesNotMatch(engine, /fankuai\\/blocks\\//)
+  assert.doesNotMatch(world, /MINECRAFT_REGISTRY|BLOCK_META_BY_ID/)
+  assert.match(world, /const TILE_COUNT = 16/)
+  assert.match(world, /export const BLOCKS = \\[GRASS, DIRT, STONE, SAND, WATER, LOG, LEAVES, PLANKS, COBBLE, GLASS\\] as const/)
 })
 
 test('standalone item PNG assets remain exported even though the backpack UI is removed', async () => {
