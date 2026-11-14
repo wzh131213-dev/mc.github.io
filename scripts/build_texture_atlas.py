@@ -3,6 +3,7 @@
 import hashlib
 import io
 import json
+import math
 import shutil
 import urllib.parse
 import urllib.request
@@ -15,7 +16,7 @@ REGISTRY = json.loads((ROOT / "minecraft-26.3-registry.json").read_text(encoding
 OUT = ROOT / "public" / "vanilla-block-atlas.png"
 CREDITS_OUT = ROOT / "public" / "TEXTURE_CREDITS.md"
 TILE = 16
-GRID = 64
+GRID = math.ceil(math.sqrt(12 + len(REGISTRY["blocks"]) * 3))
 HEADERS = {"User-Agent": "mc.github.io texture-atlas-builder/1.0"}
 
 def get(url):
