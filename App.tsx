@@ -4,7 +4,7 @@ import { Engine } from './engine'
 import type { InfoPayload, Settings } from './engine'
 import Logo from './Logo'
 import TouchControls from './TouchControls'
-import { BLOCKS, HOTBAR, blockIcon, dirtDataURL, onAtlasReady } from './world'
+import { BLOCKS, HOTBAR, blockIcon, dirtDataURL } from './world'
 
 type Screen = 'title' | 'options' | 'multi' | 'loading' | 'playing' | 'paused' | 'quit'
 
@@ -136,9 +136,6 @@ export default function App() {
   const [touch, setTouch] = useState(false)
   const [progress, setProgress] = useState(0)
   const [splash] = useState(() => SPLASHES[Math.floor(Math.random() * SPLASHES.length)])
-  const [, setAtlasVersion] = useState(0)
-
-  useEffect(() => onAtlasReady(() => setAtlasVersion((version) => version + 1)), [])
 
   const go = useCallback((s: Screen) => {
     screenRef.current = s
