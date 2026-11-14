@@ -528,20 +528,6 @@ export class Engine {
     this.chunks.set(key, entry)
   }
 
-  /** 方块被改动后重建它所在(和相邻)的区块;没加载的区块不用管,下次进入视野时自然是新的 */
-  private rebuildAround(x: number, z: number) {
-    const cx = x >> 4
-    const cz = z >> 4
-    const lx = x & 15
-    const lz = z & 15
-    const dxs = [0]
-    const dzs = [0]
-    if (lx === 0) dxs.push(-1)
-    if (lx === CS - 1) dxs.push(1)
-    if (lz === 0) dzs.push(-1)
-    if (lz === CS - 1) dzs.push(1)
-    for (const dx of dxs) for (const dz of dzs) if (this.chunks.has(ckey(cx + dx, cz + dz))) this.rebuildChunk(cx + dx, cz + dz)
-  }
 
   /**
    * 视野驱动的区块加载:
