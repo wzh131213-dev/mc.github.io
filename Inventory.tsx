@@ -93,7 +93,7 @@ function itemGlyph(name: string) {
   return name.slice(0, 2).toUpperCase()
 }
 
-const ITEM_TEXTURE_BASE = new URL('minecraft-item-textures/', document.baseURI).toString()
+const ITEM_TEXTURE_BASE = new URL('fankuai/items/', document.baseURI).toString()
 
 // These vanilla icons are animated or have a dedicated inventory/standby sprite.
 // Their canonical item IDs do not have a same-named PNG in the 26.3 texture pack.
