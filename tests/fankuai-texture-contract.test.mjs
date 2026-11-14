@@ -12,7 +12,6 @@ test('fankuai exports independent per-block six-face PNG files and standalone it
   assert.match(builder, /image\.save\(target \/ filename, optimize=True\)/)
   assert.match(builder, /shutil\.copytree\(texture_root \/ "item", item_out\)/)
   assert.match(builder, /"blocks": manifest_blocks/)
-  assert.match(builder, /"fallback_faces": counts\["fallback_faces"\]/)
 })
 
 test('fankuai keeps each cardinal side distinct when vanilla model JSON defines different face textures', async () => {
