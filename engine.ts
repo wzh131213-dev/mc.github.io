@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { AnimalManager } from './Animals'
 import { MonsterManager } from './Monsters'
-import { AIR, CS, HOTBAR, SY, WATER, World, ckey, getAtlasTexture, getWorld, valueNoise } from './world'
+import { AIR, BLOCK_META_BY_ID, CS, HOTBAR, SY, WATER, World, ckey, getAtlasTexture, getWorld, valueNoise } from './world'
 
 export interface Settings {
   fov: number
@@ -17,7 +17,7 @@ export interface InfoPayload {
 }
 
 /** seen:最后一次出现在视野里的时间(秒),用来延迟卸载 */
-type ChunkMesh = { opaque?: THREE.Mesh; water?: THREE.Mesh; seen: number }
+type ChunkMesh = { opaque?: THREE.Mesh[]; water?: THREE.Mesh; seen: number }
 
 /** 始终保持加载的近身区块半径(1 = 周围 3×3),避免脚下和身后出现空洞 */
 const NEAR = 1
@@ -27,6 +27,55 @@ const PAD = 6
 const UNLOAD_DELAY = 2
 /** 内存里最多保留多少个区块的方块数据(被玩家改过的区块不会被回收) */
 const MAX_DATA_CHUNKS = 1400
+
+// Six independent PNG files per block. Materials are shared between chunks;
+// the source assets remain separate under public/fankuai/blocks/<name>/.
+const BLOCK_FACE_ORDER = ['east', 'west', 'top', 'bottom', 'south', 'north'] as const
+const blockMaterialCache = new Map<number, THREE.MeshStandardMaterial[]>()
+const blockTextureLoader = new THREE.TextureLoader()
+
+function getBlockFaceMaterials(blockId: number) {
+  const cached = blockMaterialCache.get(blockId)
+  if (cached) return cached
+  const block = BLOCK_META_BY_ID.get(blockId)
+  const name = block?.name
+  const materials = BLOCK_FACE_ORDER.map((face) => {
+    const material = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      alphaTest: 0.5,
+      roughness: 0.94,
+      metalness: 0,
+    })
+    if (name) {
+      const url = new URL(`fankuai/blocks/${encodeURIComponent(name)}/${face}.png`, document.baseURI).toString()
+      const texture = blockTextureLoader.load(
+        url,
+        (loaded) => {
+          loaded.magFilter = THREE.NearestFilter
+          loaded.minFilter = THREE.NearestFilter
+          loaded.generateMipmaps = false
+          loaded.colorSpace = THREE.SRGBColorSpace
+          material.map = loaded
+          material.needsUpdate = true
+        },
+        undefined,
+        () => {
+          material.map = null
+          material.color.set(0x999999)
+          material.needsUpdate = true
+        },
+      )
+      texture.magFilter = THREE.NearestFilter
+      texture.minFilter = THREE.NearestFilter
+      texture.generateMipmaps = false
+      texture.colorSpace = THREE.SRGBColorSpace
+      material.map = texture
+    }
+    return material
+  })
+  blockMaterialCache.set(blockId, materials)
+  return materials
+}
 
 const FOG_COLOR = 0xcbd8df
 const PLAYER_W = 0.6
@@ -63,7 +112,6 @@ export class Engine {
   private wantTotal = 0
   private wantLoaded = 0
   private trimTimer = 0
-  private opaqueMat: THREE.MeshStandardMaterial
   private waterMat: THREE.MeshStandardMaterial
   private sunLight: THREE.DirectionalLight
   private hemiLight: THREE.HemisphereLight
@@ -128,14 +176,7 @@ export class Engine {
     this.scene.background = new THREE.Color(FOG_COLOR)
 
     const tex = getAtlasTexture()
-    // 标准材质让区块真正响应半球环境光与方向光,保留像素贴图和顶点 AO
-    this.opaqueMat = new THREE.MeshStandardMaterial({
-      map: tex,
-      vertexColors: true,
-      alphaTest: 0.5,
-      roughness: 0.94,
-      metalness: 0,
-    })
+    // Water retains its existing atlas material; solid blocks use independent PNG materials.
     this.waterMat = new THREE.MeshStandardMaterial({
       map: tex,
       vertexColors: true,
@@ -404,7 +445,7 @@ export class Engine {
     this.canvas.removeEventListener('contextmenu', this.prevent)
     this.canvas.removeEventListener('wheel', this.onWheel)
     this.chunks.forEach((c) => {
-      c.opaque?.geometry.dispose()
+      c.opaque?.forEach((mesh) => mesh.geometry.dispose())
       c.water?.geometry.dispose()
     })
     this.chunks.clear()
@@ -452,8 +493,10 @@ export class Engine {
     const old = this.chunks.get(key)
     if (!old) return
     if (old.opaque) {
-      this.scene.remove(old.opaque)
-      old.opaque.geometry.dispose()
+      for (const mesh of old.opaque) {
+        this.scene.remove(mesh)
+        mesh.geometry.dispose()
+      }
     }
     if (old.water) {
       this.scene.remove(old.water)
@@ -467,11 +510,14 @@ export class Engine {
     this.unloadChunk(key)
     const { opaque, water } = this.world.buildChunk(cx, cz)
     const entry: ChunkMesh = { seen: this.time }
-    if (opaque) {
-      entry.opaque = new THREE.Mesh(opaque, this.opaqueMat)
-      entry.opaque.castShadow = true
-      entry.opaque.receiveShadow = true
-      this.scene.add(entry.opaque)
+    if (opaque.length) {
+      entry.opaque = opaque.map(({ blockId, geometry }) => {
+        const mesh = new THREE.Mesh(geometry, getBlockFaceMaterials(blockId))
+        mesh.castShadow = true
+        mesh.receiveShadow = true
+        this.scene.add(mesh)
+        return mesh
+      })
     }
     if (water) {
       entry.water = new THREE.Mesh(water, this.waterMat)
