@@ -194,7 +194,7 @@ test('every registered block gets a distinct three-face atlas tile in a 64 by 64
   assert.ok(world.includes('const TILE_COUNT = 64'))
   assert.ok(world.includes('const base = 12 + index * 3'))
   assert.ok(world.includes('getBlockTiles(b)'))
-  assert.ok(world.includes("new URL('vanilla-block-atlas.png', document.baseURI)"))
+  assert.ok(world.includes("new URL('vanilla-block-atlas.png?v=20261114-texture-fix-2', document.baseURI)"))
   assert.ok(world.includes('onAtlasReady'))
 })
 
