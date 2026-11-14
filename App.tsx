@@ -1,43 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { createPortal } from 'react-dom'
 import { Engine } from './engine'
 import type { InfoPayload, Settings } from './engine'
 import Logo from './Logo'
 import TouchControls from './TouchControls'
 import { BLOCKS, HOTBAR, blockIcon, dirtDataURL, onAtlasReady } from './world'
-import MINECRAFT_REGISTRY from './minecraft-26.3-registry.json'
-import Inventory, { type InventoryStack } from './Inventory'
 
 type Screen = 'title' | 'options' | 'multi' | 'loading' | 'playing' | 'paused' | 'quit'
 
 const HOTBAR_STORAGE_KEY = 'mc-web-hotbar:v1'
-const BAG_STORAGE_KEY = 'mc-web-inventory:v1'
-const ITEM_IDS = new Set(MINECRAFT_REGISTRY.items.map((item) => item.id))
-const ITEM_STACK_LIMITS = new Map(MINECRAFT_REGISTRY.items.map((item) => [item.id, item.stack]))
-
-function readSavedInventory(): InventoryStack[] {
-  try {
-    const raw = window.localStorage.getItem(BAG_STORAGE_KEY)
-    const value: unknown = raw ? JSON.parse(raw) : null
-    if (
-      Array.isArray(value) &&
-      value.length === 27 &&
-      value.every((slot) => slot === null || (
-        typeof slot === 'object' && slot !== null &&
-        Number.isInteger((slot as { itemId?: unknown }).itemId) &&
-        ITEM_IDS.has((slot as { itemId: number }).itemId) &&
-        Number.isInteger((slot as { count?: unknown }).count) &&
-        (slot as { count: number }).count > 0 &&
-        (slot as { count: number }).count <= (ITEM_STACK_LIMITS.get((slot as { itemId: number }).itemId) ?? 0)
-      ))
-    ) return value as InventoryStack[]
-  } catch {
-    // 损坏或不可用的存档回退为空背包。
-  }
-  return Array.from({ length: 27 }, () => null)
-}
-
 function readSavedHotbar(): number[] {
   try {
     const raw = window.localStorage.getItem(HOTBAR_STORAGE_KEY)
@@ -69,9 +40,9 @@ const SPLASHES = [
   '像素风永不过时!',
 ]
 
-const TIPS = 'WASD 移动 · 空格 跳跃(双击飞行) · Shift 疾跑 · 左键 破坏 · 右键 放置 · 1-9 / 滚轮 切换方块 · E 背包 · Esc 菜单'
+const TIPS = 'WASD 移动 · 空格 跳跃(双击飞行) · Shift 疾跑 · 左键 破坏 · 右键 放置 · 1-9 / 滚轮 切换方块 · Esc 菜单'
 const TIPS_TOUCH =
-  '左下十字键 移动(连点两下 ↑ 疾跑) · 屏幕上滑动 转视角 · 轻点 放置方块 · 长按 破坏方块 · 连点两下跳跃键 飞行 · 右上角背包 · 点快捷栏切换方块'
+  '左下十字键 移动(连点两下 ↑ 疾跑) · 屏幕上滑动 转视角 · 轻点 放置方块 · 长按 破坏方块 · 连点两下跳跃键 飞行 · 点快捷栏切换方块'
 
 function McButton({
   children,
@@ -160,29 +131,7 @@ export default function App() {
   }))
   const [slot, setSlot] = useState(0)
   const [hotbarBlocks, setHotbarBlocks] = useState<number[]>(readSavedHotbar)
-  const [bagSlots, setBagSlots] = useState<InventoryStack[]>(readSavedInventory)
   const [saveWarning, setSaveWarning] = useState(false)
-  const [inventoryOpen, setInventoryOpen] = useState(false)
-  const inventoryOpenRef = useRef(false)
-  const setInventoryVisibility = useCallback((open: boolean) => {
-    inventoryOpenRef.current = open
-    setInventoryOpen(open)
-  }, [])
-  const openInventory = useCallback(() => {
-    setInventoryVisibility(true)
-    const engine = engineRef.current
-    engine?.setActive(false)
-    // 桌面模式打开物品栏时释放鼠标指针锁定，让关闭/替换按钮真正可点击。
-    engine?.unlock()
-  }, [setInventoryVisibility])
-  const closeInventory = useCallback((restorePointerLock = true) => {
-    setInventoryVisibility(false)
-    const engine = engineRef.current
-    if (screenRef.current === 'playing') {
-      engine?.setActive(true)
-      if (restorePointerLock && engine && !engine.touchMode && !engine.isLocked() && !engine.noLock) engine.lock()
-    }
-  }, [setInventoryVisibility])
   const [info, setInfo] = useState<InfoPayload>({ text: '', chunkText: '', underwater: false, fly: false })
   const [touch, setTouch] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -194,9 +143,8 @@ export default function App() {
   const go = useCallback((s: Screen) => {
     screenRef.current = s
     setScreenState(s)
-    setInventoryVisibility(false)
     engineRef.current?.setActive(s === 'playing')
-  }, [setInventoryVisibility])
+  }, [])
 
   useEffect(() => {
     const engine = new Engine(canvasRef.current!)
@@ -207,18 +155,13 @@ export default function App() {
     setTouch(engine.touchMode)
     engine.onLockChange = (locked) => {
       if (locked) return
-      // 打开背包时主动释放鼠标锁定，但不应因此关闭背包或进入暂停菜单。
-      if (inventoryOpenRef.current) {
-        engine.setActive(false)
-        return
-      }
       if (screenRef.current === 'playing') go('paused')
     }
     return () => {
       engine.dispose()
       engineRef.current = null
     }
-  }, [go, setInventoryVisibility])
+  }, [go])
 
   useEffect(() => {
     engineRef.current?.setSettings(settings)
@@ -236,14 +179,6 @@ export default function App() {
     }
   }, [hotbarBlocks])
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(BAG_STORAGE_KEY, JSON.stringify(bagSlots))
-    } catch {
-      setSaveWarning(true)
-    }
-  }, [bagSlots])
-
   // iOS Safari 忽略 user-scalable=no,需要拦截捏合手势
   useEffect(() => {
     const stop = (e: Event) => e.preventDefault()
@@ -255,18 +190,12 @@ export default function App() {
     }
   }, [])
 
-  // 指针锁定可用时由 pointerlockchange 负责 Esc；触屏/无锁定模式由这里处理。
+  // Esc 仅用于暂停菜单，不再打开或关闭背包。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Escape') return
       const s = screenRef.current
       const eng = engineRef.current
-      if (inventoryOpenRef.current) {
-        // 桌面浏览器按 Esc 会退出指针锁定；随后由此处理器关闭背包。
-        if (s === 'playing' && eng && !eng.touchMode && eng.isLocked()) return
-        closeInventory(false)
-        return
-      }
       if (s === 'playing') {
         if (eng && !eng.touchMode && !eng.noLock) return
         go('paused')
@@ -278,24 +207,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [closeInventory, go])
-
-  useEffect(() => {
-    const onInventoryKey = (e: KeyboardEvent) => {
-      if (e.code !== 'KeyE' || !['playing', 'paused'].includes(screenRef.current) || e.repeat) return
-      const target = e.target
-      if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
-      e.preventDefault()
-      const next = !inventoryOpenRef.current
-      setInventoryVisibility(next)
-      const engine = engineRef.current
-      engine?.setActive(!next && screenRef.current === 'playing')
-      if (next) engine?.unlock()
-      else if (screenRef.current === 'playing' && engine && !engine.touchMode && !engine.noLock) engine.lock()
-    }
-    window.addEventListener('keydown', onInventoryKey)
-    return () => window.removeEventListener('keydown', onInventoryKey)
-  }, [setInventoryVisibility])
+  }, [go])
 
   // 加载界面:真实等待视野内的区块生成完毕(至少 1 秒,最多 15 秒)
   useEffect(() => {
@@ -531,91 +443,9 @@ export default function App() {
         </div>
       )}
 
-      {inventoryOpen && (screen === 'playing' || screen === 'paused') && (
-        <Inventory
-          selected={slot}
-          hotbar={hotbarBlocks}
-          bag={bagSlots}
-          onSelect={(i) => { engineRef.current?.selectSlot(i); setSlot(i) }}
-          onEquip={(id, targetSlot) => {
-            const target = targetSlot ?? slot
-            setHotbarBlocks((current) => {
-              const next = [...current]
-              next[target] = id
-              if (engineRef.current) engineRef.current.hotbar[target] = id
-              return next
-            })
-          }}
-          onGive={(itemId, count) => {
-            const item = MINECRAFT_REGISTRY.items.find((entry) => entry.id === itemId)
-            if (!item) return
-            const maxStack = Math.min(64, Math.max(1, item.stack))
-            setBagSlots((current) => {
-              const next = [...current]
-              let remaining = Math.min(count, maxStack)
-              for (let i = 0; i < next.length && remaining > 0; i++) {
-                const stack = next[i]
-                if (stack?.itemId !== itemId || stack.count >= maxStack) continue
-                const added = Math.min(maxStack - stack.count, remaining)
-                next[i] = { itemId, count: stack.count + added }
-                remaining -= added
-              }
-              for (let i = 0; i < next.length && remaining > 0; i++) {
-                if (next[i] !== null) continue
-                const added = Math.min(maxStack, remaining)
-                next[i] = { itemId, count: added }
-                remaining -= added
-              }
-              return next
-            })
-          }}
-          onRemove={(index) => setBagSlots((current) => current.map((stack, i) => i === index ? null : stack))}
-          onMove={(from, to) => setBagSlots((current) => {
-            const next = [...current]
-            const source = next[from]
-            if (!source || from === to) return current
-            const target = next[to]
-            if (!target) {
-              next[to] = source
-              next[from] = null
-              return next
-            }
-            if (target.itemId === source.itemId) {
-              const item = MINECRAFT_REGISTRY.items.find((entry) => entry.id === source.itemId)
-              const limit = Math.min(64, Math.max(1, item?.stack ?? 64))
-              const moved = Math.min(limit - target.count, source.count)
-              if (moved <= 0) return current
-              next[to] = { itemId: target.itemId, count: target.count + moved }
-              next[from] = source.count > moved ? { itemId: source.itemId, count: source.count - moved } : null
-              return next
-            }
-            next[from] = target
-            next[to] = source
-            return next
-          })}
-          onClose={closeInventory}
-        />
-      )}
-
       {/* ---------------------------- TOUCH CONTROLS ---------------------------- */}
       {touch && screen === 'playing' && (
         <TouchControls engineRef={engineRef} onPause={() => go('paused')} />
-      )}
-
-      {/* 独立背包入口通过 Portal 挂到 body，脱离游戏画布/触控层的层叠上下文。 */}
-      {(screen === 'playing' || screen === 'paused') && !inventoryOpen && createPortal(
-        <button
-          type="button"
-          className="inventory-launcher"
-          aria-label="打开背包"
-          aria-haspopup="dialog"
-          aria-expanded={inventoryOpen}
-          onClick={openInventory}
-        >
-          <span aria-hidden="true">▦</span>
-          <span>背包</span>
-        </button>,
-        document.body,
       )}
 
       {/* ------------------------------ PAUSE ------------------------------ */}
