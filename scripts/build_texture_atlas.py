@@ -116,7 +116,7 @@ def fallback(name, face_index):
     return image
 
 def load_vanilla_model_resolver():
-    """Read 26.3 blockstate/model JSON from Mojang's client jar; only texture IDs are used."""
+    """Resolve the canonical block model's actual face textures from the 26.3 client jar."""
     manifest = json.loads(get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"))
     release = next((entry for entry in manifest["versions"] if entry.get("id") == "26.3"), None)
     if release is None:
@@ -125,8 +125,9 @@ def load_vanilla_model_resolver():
     client_url = version_json["downloads"]["client"]["url"]
     jar = zipfile.ZipFile(io.BytesIO(get(client_url)))
     model_cache = {}
+    face_cache = {}
 
-    def model_textures(model_id, stack=()):
+    def read_model(model_id):
         if not model_id:
             return {}
         if ":" in model_id:
@@ -135,21 +136,56 @@ def load_vanilla_model_resolver():
             namespace, model_path = "minecraft", model_id
         if namespace != "minecraft":
             return {}
-        key = f"{namespace}:{model_path}"
+        try:
+            return json.loads(jar.read(f"assets/{namespace}/models/{model_path}.json"))
+        except (KeyError, json.JSONDecodeError):
+            return {}
+
+    def model_textures(model_id, stack=()):
+        if not model_id:
+            return {}
+        key = model_id if ":" in model_id else f"minecraft:{model_id}"
         if key in model_cache:
             return model_cache[key]
         if key in stack:
             return {}
-        file_path = f"assets/{namespace}/models/{model_path}.json"
-        try:
-            model = json.loads(jar.read(file_path))
-        except (KeyError, json.JSONDecodeError):
-            model_cache[key] = {}
-            return {}
+        model = read_model(key)
         inherited = dict(model_textures(model.get("parent"), stack + (key,)))
         inherited.update(model.get("textures", {}))
         model_cache[key] = inherited
         return inherited
+
+    def model_face_textures(model_id, stack=()):
+        """Return texture references by geometric face, preserving child texture overrides."""
+        if not model_id:
+            return {}
+        key = model_id if ":" in model_id else f"minecraft:{model_id}"
+        if key in face_cache:
+            return face_cache[key]
+        if key in stack:
+            return {}
+        model = read_model(key)
+        parent_faces = dict(model_face_textures(model.get("parent"), stack + (key,)))
+        elements = model.get("elements")
+        if isinstance(elements, list):
+            for element in elements:
+                faces = element.get("faces", {})
+                if not isinstance(faces, dict):
+                    continue
+                for direction, face_data in faces.items():
+                    if not isinstance(face_data, dict) or not isinstance(face_data.get("texture"), str):
+                        continue
+                    if direction == "up":
+                        parent_faces["top"] = face_data["texture"]
+                    elif direction == "down":
+                        parent_faces["bottom"] = face_data["texture"]
+                    elif direction in ("north", "south", "east", "west"):
+                        parent_faces.setdefault("sides", []).append(face_data["texture"])
+                    elif direction == "all":
+                        parent_faces["top"] = parent_faces["bottom"] = face_data["texture"]
+                        parent_faces.setdefault("sides", []).append(face_data["texture"])
+        face_cache[key] = parent_faces
+        return parent_faces
 
     def resolve_ref(ref, textures):
         visited = set()
@@ -167,9 +203,28 @@ def load_vanilla_model_resolver():
                 return None
         else:
             path = ref
-        if path.startswith("block/"):
-            return path[len("block/"):]
-        return None
+        return path[len("block/"):] if path.startswith("block/") else None
+
+    def choose_default_variant(variants):
+        """Prefer vanilla's neutral/default state, never arbitrary alphabetical state."""
+        if "" in variants:
+            return variants[""]
+        preferred = {
+            "axis": "y", "facing": "north", "half": "lower", "hinge": "left",
+            "part": "single", "type": "bottom", "age": "0", "stage": "0",
+            "lit": "false", "open": "false", "powered": "false",
+            "waterlogged": "false", "persistent": "false", "snowy": "false",
+            "attached": "false", "berries": "false", "rotation": "0",
+            "moisture": "0", "note": "0", "pickles": "1", "eggs": "1",
+        }
+        def score(key):
+            states = {}
+            for pair in key.split(","):
+                if "=" in pair:
+                    name, value = pair.split("=", 1)
+                    states[name.strip()] = value.strip()
+            return sum(states.get(name) == value for name, value in preferred.items())
+        return variants[max(sorted(variants), key=score)]
 
     def faces_for(block_name):
         try:
@@ -179,30 +234,43 @@ def load_vanilla_model_resolver():
         model_ids = []
         variants = state.get("variants")
         if isinstance(variants, dict) and variants:
-            first = variants[sorted(variants.keys())[0]]
-            choices = first if isinstance(first, list) else [first]
+            selected = choose_default_variant(variants)
+            choices = selected if isinstance(selected, list) else [selected]
             model_ids.extend(choice.get("model") for choice in choices if isinstance(choice, dict))
         multipart = state.get("multipart")
-        if isinstance(multipart, list):
+        if isinstance(multipart, list) and not model_ids:
             for part in multipart:
                 apply = part.get("apply", {})
                 choices = apply if isinstance(apply, list) else [apply]
                 model_ids.extend(choice.get("model") for choice in choices if isinstance(choice, dict))
+
         output = {}
+        side_candidates = []
         for model_id in model_ids:
             textures = model_textures(model_id)
-            for face, keys in {
-                "top": ("up", "top", "end", "all", "side", "front"),
-                "bottom": ("down", "bottom", "end", "all", "side", "front"),
-                "side": ("north", "side", "all", "front", "south", "east", "west"),
-            }.items():
-                if face in output:
-                    continue
-                for texture_key in keys:
-                    resolved = resolve_ref(textures.get(texture_key), textures)
-                    if resolved:
-                        output[face] = resolved
-                        break
+            refs = model_face_textures(model_id)
+            # Parent models without explicit elements still expose conventional texture slots.
+            if not refs:
+                refs = {
+                    "top": textures.get("up") or textures.get("top") or textures.get("end") or textures.get("all"),
+                    "bottom": textures.get("down") or textures.get("bottom") or textures.get("end") or textures.get("all"),
+                    "sides": [textures.get("side") or textures.get("all") or textures.get("front")],
+                }
+            for face in ("top", "bottom"):
+                resolved = resolve_ref(refs.get(face), textures)
+                if resolved and face not in output:
+                    output[face] = resolved
+            for ref in refs.get("sides", []):
+                resolved = resolve_ref(ref, textures)
+                if resolved:
+                    side_candidates.append(resolved)
+        if side_candidates:
+            # Directional blocks often have a unique front texture; a cube has one side
+            # texture, so use the most common side face instead of accidentally using north/front.
+            counts = {}
+            for value in side_candidates:
+                counts[value] = counts.get(value, 0) + 1
+            output["side"] = max(sorted(counts), key=lambda value: counts[value])
         return output
 
     return faces_for
