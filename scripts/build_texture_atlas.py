@@ -277,7 +277,26 @@ def load_vanilla_model_resolver():
     return faces_for
 
 
+SPECIAL_TEXTURE_ALIASES = {
+    "lava": {"top": ("lava_still", "lava_flow"), "bottom": ("lava_still",), "side": ("lava_still", "lava_flow")},
+    "fire": {"top": ("fire_0", "fire_1"), "bottom": ("fire_0", "fire_1"), "side": ("fire_0", "fire_1")},
+    "soul_fire": {"top": ("soul_fire_0", "soul_fire_1"), "bottom": ("soul_fire_0",), "side": ("soul_fire_0", "soul_fire_1")},
+    "moving_piston": {"top": ("piston_top",), "bottom": ("piston_bottom",), "side": ("piston_side",)},
+    "glass_pane": {"top": ("glass_pane_top",), "bottom": ("glass_pane_top",), "side": ("glass_pane_top",)},
+    "wheat": {"top": ("wheat_stage0",), "bottom": ("wheat_stage0",), "side": ("wheat_stage0",)},
+    "carrots": {"top": ("carrots_stage0",), "bottom": ("carrots_stage0",), "side": ("carrots_stage0",)},
+    "potatoes": {"top": ("potatoes_stage0",), "bottom": ("potatoes_stage0",), "side": ("potatoes_stage0",)},
+    "end_portal": {"top": ("nether_portal",), "bottom": ("nether_portal",), "side": ("nether_portal",)},
+}
+
 def pick(textures, name, face, model_texture=None):
+    for alias in SPECIAL_TEXTURE_ALIASES.get(name, {}).get(face, ()):
+        if alias in textures:
+            return textures[alias]
+    if name.startswith("waxed_"):
+        unwaxed = name[len("waxed_"):]
+        if unwaxed in textures:
+            return textures[unwaxed]
     suffixes = {"top": ("_top", "_end"), "bottom": ("_bottom", "_end"), "side": ("_side", "_front", "_all")}
     aliases = ([model_texture] if model_texture else []) + [name]
     # Wall-mounted variants reuse the corresponding standing block texture.
