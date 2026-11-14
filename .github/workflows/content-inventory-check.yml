@@ -25,6 +25,8 @@ jobs:
         run: npm ci
       - name: Dependency security audit
         run: npm audit --audit-level=low
+      - name: Validate texture atlas builder syntax
+        run: python -m py_compile scripts/build_texture_atlas.py
       - name: Inventory and world regression tests
         run: npm test
       - name: TypeScript check
