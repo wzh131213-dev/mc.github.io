@@ -24,6 +24,15 @@ test('atlas model resolver maps actual element face textures and inherits parent
   assert.match(builder, /"north"/)
 })
 
+test('special vanilla blocks resolve their real texture filenames instead of random color fallbacks', async () => {
+  const builder = await read('scripts/build_texture_atlas.py')
+  for (const name of ['lava_still', 'fire_0', 'piston_top', 'piston_side', 'glass_pane_top', 'wheat_stage0', 'carrots_stage0', 'potatoes_stage0', 'nether_portal']) {
+    assert.ok(builder.includes(name), `missing special texture alias: ${name}`)
+  }
+  assert.match(builder, /SPECIAL_TEXTURE_ALIASES/)
+  assert.match(builder, /name\.startswith\("waxed_"\)/)
+})
+
 test('atlas build reports unresolved vanilla blocks rather than silently hiding random fallback usage', async () => {
   const builder = await read('scripts/build_texture_atlas.py')
   assert.match(builder, /unmapped_blocks/)
