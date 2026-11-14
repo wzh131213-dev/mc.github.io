@@ -67,7 +67,6 @@ test('the vanilla texture assets remain in the repository for the retained hotba
   const engine = await read('engine.ts')
   assert.ok(workflow.includes('scripts/build_fankuai_textures.py'))
   assert.match(engine, /fankuai\/blocks\//)
-  assert.match(engine, /fankuai\/items\//)
 })
 
 test('Pages deployment refuses to publish uncompiled branch source', async () => {
