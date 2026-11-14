@@ -450,6 +450,32 @@ function hash3(x: number, y: number, z: number, seed: number) {
   return (h >>> 0) / 4294967296
 }
 
+function combineFaceGeometry(parts: MeshData[]) {
+  const geometry = new THREE.BufferGeometry()
+  const positions: number[] = []
+  const uvs: number[] = []
+  const colors: number[] = []
+  const indices: number[] = []
+  parts.forEach((part, materialIndex) => {
+    if (part.idx.length === 0) return
+    const vertexOffset = positions.length / 3
+    const indexStart = indices.length
+    positions.push(...part.pos)
+    uvs.push(...part.uv)
+    colors.push(...part.col)
+    indices.push(...part.idx.map((index) => index + vertexOffset))
+    geometry.addGroup(indexStart, part.idx.length, materialIndex)
+  })
+  if (indices.length === 0) return null
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  geometry.setIndex(new THREE.Uint32BufferAttribute(indices, 1))
+  geometry.computeVertexNormals()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
 export class Chunk {
   data = new Uint16Array(CS * CS * SY)
   /** 本区块内最高的非空气方块高度,网格化时只扫到这一层 */
@@ -751,12 +777,13 @@ export class World {
   }
 
   buildChunk(cx: number, cz: number) {
-    const o = new MeshData()
-    const w = new MeshData()
+    const water = new MeshData()
+    const opaqueByBlock = new Map<number, MeshData[]>()
     const ch = this.getChunk(cx, cz)
     const x0 = cx * CS
     const z0 = cz * CS
     const aoV = [3, 3, 3, 3]
+    const faceIndexByNormal = [0, 1, 2, 3, 4, 5]
 
     for (let y = 0; y <= ch.maxY; y++) {
       for (let z = z0; z < z0 + CS; z++) {
@@ -764,9 +791,14 @@ export class World {
           const b = ch.data[(y * CS + (z - z0)) * CS + (x - x0)]
           if (!b) continue
           const isWater = b === WATER
-          const md = isWater ? w : o
           const tiles = getBlockTiles(b)
-          for (const f of FACES) {
+          let blockFaces = isWater ? null : opaqueByBlock.get(b)
+          if (!isWater && !blockFaces) {
+            blockFaces = Array.from({ length: 6 }, () => new MeshData())
+            opaqueByBlock.set(b, blockFaces)
+          }
+          for (let faceIndex = 0; faceIndex < FACES.length; faceIndex++) {
+            const f = FACES[faceIndex]
             const nb = this.get(x + f.n[0], y + f.n[1], z + f.n[2])
             if (isWater) {
               if (nb !== AIR) continue
@@ -774,6 +806,7 @@ export class World {
               if (nb === b || OCC[nb]) continue
             } else if (OCC[nb]) continue
 
+            const md = isWater ? water : blockFaces![faceIndex]
             const tile = tiles[f.ti]
             const tileX = tile % TILE_COUNT
             const tileY = Math.floor(tile / TILE_COUNT)
@@ -788,17 +821,18 @@ export class World {
             const useAO = !isWater && b !== GLASS
             const topH = isWater && this.get(x, y + 1, z) !== WATER ? 0.9 : 1
             for (let i = 0; i < 4; i++) {
-              const c = f.c[i]
-              md.pos.push(x + c[0], y + (c[1] ? topH : 0), z + c[2])
-              md.uv.push(i === 1 || i === 2 ? u1 : u0, i >= 2 ? v1 : v0)
-              let br = f.shade
+              const corner = f.c[i]
+              md.pos.push(x + corner[0], y + (corner[1] ? topH : 0), z + corner[2])
+              // Independent face images use the full 0..1 UV range.
+              md.uv.push(i === 1 || i === 2 ? 1 : 0, i >= 2 ? 1 : 0)
+              let brightness = f.shade
               if (useAO) {
-                const a = this.ao(x + f.n[0], y + f.n[1], z + f.n[2], a1, a2, c[a1] * 2 - 1, c[a2] * 2 - 1)
-                aoV[i] = a
-                br *= AO_B[a]
+                const ao = this.ao(x + f.n[0], y + f.n[1], z + f.n[2], a1, a2, corner[a1] * 2 - 1, corner[a2] * 2 - 1)
+                aoV[i] = ao
+                brightness *= AO_B[ao]
               }
               const tint = getBlockTint(b)
-              md.col.push(br * tint[0], br * tint[1], br * tint[2])
+              md.col.push(brightness * tint[0], brightness * tint[1], brightness * tint[2])
             }
             if (useAO && aoV[0] + aoV[2] < aoV[1] + aoV[3]) {
               md.idx.push(base + 1, base + 2, base + 3, base + 1, base + 3, base)
@@ -809,9 +843,12 @@ export class World {
         }
       }
     }
-    return { opaque: o.toGeometry(), water: w.toGeometry() }
-  }
-}
+    const opaque = [...opaqueByBlock.entries()].flatMap(([blockId, faces]) => {
+      const geometry = combineFaceGeometry(faces)
+      return geometry ? [{ blockId, geometry }] : []
+    })
+    return { opaque, water: water.toGeometry() }
+  }}
 
 let world: World | null = null
 export function getWorld() {
