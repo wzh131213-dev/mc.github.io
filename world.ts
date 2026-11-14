@@ -41,7 +41,7 @@ export const BLOCK_LABELS = new Map<number, string>(MINECRAFT_REGISTRY.blocks.ma
 export const HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, SAND, GLASS, LEAVES]
 
 const TILE = 16
-const TILE_COUNT = 64
+const TILE_COUNT = Math.ceil(Math.sqrt(12 + MINECRAFT_REGISTRY.blocks.length * 3))
 
 // [top, bottom, side]
 const BLOCK_TILES: Record<number, [number, number, number]> = {
