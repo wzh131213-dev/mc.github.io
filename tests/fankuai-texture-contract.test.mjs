@@ -14,12 +14,14 @@ test('fankuai exports independent per-block six-face PNG files and standalone it
   assert.match(builder, /"blocks": manifest_blocks/)
 })
 
-test('fankuai keeps each cardinal side distinct when vanilla model JSON defines different face textures', async () => {
+test('fankuai resolves each cardinal model face independently instead of collapsing all sides', async () => {
   const builder = await read('scripts/build_fankuai_textures.py')
-  for (const face of ['north', 'south', 'east', 'west']) {
-    assert.match(builder, new RegExp(`faces\\.get\\(face\\)`))
-    assert.match(builder, new RegExp(`"\\${face}"`))
-  }
-  assert.match(builder, /for face in FACE_NAMES/)
+  assert.match(builder, /for face in FACE_NAMES:/)
+  assert.match(builder, /data = faces\.get\(face\)/)
+  assert.match(builder, /result\[face\] = path/)
   assert.match(builder, /directional_refs\(name\)/)
+  assert.match(builder, /"north"/)
+  assert.match(builder, /"south"/)
+  assert.match(builder, /"east"/)
+  assert.match(builder, /"west"/)
 })
