@@ -50,7 +50,7 @@ test('legacy core block textures are resolved from their exact vanilla model fac
 })
 
 
-test('atlas dimensions scale to fit all three face tiles for every registered block', async () => {
+test('runtime keeps the original sixteen-tile atlas for the original block set', async () => {
   const builder = await read('scripts/build_texture_atlas.py')
   const world = await read('world.ts')
   assert.match(builder, /GRID = math\.ceil\(math\.sqrt\(12 \+ len\(REGISTRY\["blocks"\]\) \* 3\)\)/)
