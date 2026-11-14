@@ -165,7 +165,8 @@ def load_vanilla_model_resolver():
         if key in stack:
             return {}
         model = read_model(key)
-        parent_faces = dict(model_face_textures(model.get("parent"), stack + (key,)))
+        inherited_faces = model_face_textures(model.get("parent"), stack + (key,))
+        parent_faces = {name: list(value) if name == "sides" else value for name, value in inherited_faces.items()}
         elements = model.get("elements")
         if isinstance(elements, list):
             for element in elements:
@@ -348,6 +349,7 @@ def main():
         # and makes transparent foliage/item edges unexpectedly dark.
         atlas.paste(image, ((index % GRID) * TILE, (index // GRID) * TILE))
     matched = 0
+    unmapped_blocks = []
     for index, block in enumerate(REGISTRY["blocks"]):
         name = block["name"]
         for face_index, face in enumerate(("top", "bottom", "side")):
@@ -356,6 +358,7 @@ def main():
             if image is not None:
                 matched += 1
             else:
+                unmapped_blocks.append(f"{name}:{face}")
                 image = fallback(name, face_index)
             tile = 12 + index * 3 + face_index
             atlas.paste(image, ((tile % GRID) * TILE, (tile // GRID) * TILE))
@@ -371,7 +374,21 @@ def main():
     item_count = sum(1 for path in item_out.rglob("*.png"))
     shutil.copyfile(ROOT / "TEXTURE_CREDITS.md", CREDITS_OUT)
     print(f"InventivetalentDev minecraft-assets {version}: {len(textures)} vanilla block textures; {item_count} item textures")
-    print(f"Mapped {matched}/{len(REGISTRY['blocks']) * 3} block faces from vanilla model references")
+    total_faces = len(REGISTRY["blocks"]) * 3
+    fallback_count = len(unmapped_blocks)
+    report = {
+        "minecraft_version": version,
+        "block_count": len(REGISTRY["blocks"]),
+        "total_faces": total_faces,
+        "matched_faces": matched,
+        "fallback_count": fallback_count,
+        "fallback_ratio": round(fallback_count / total_faces, 4) if total_faces else 0,
+        "unmapped_blocks": unmapped_blocks,
+    }
+    (ROOT / "public" / "texture-atlas-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Mapped {matched}/{total_faces} block faces from vanilla model references")
+    if unmapped_blocks:
+        print("Unmapped block textures ({} faces using fallback): {}".format(fallback_count, ", ".join(unmapped_blocks[:60])))
     print(f"Atlas: {OUT} ({atlas.width}x{atlas.height})")
 
 if __name__ == "__main__":
