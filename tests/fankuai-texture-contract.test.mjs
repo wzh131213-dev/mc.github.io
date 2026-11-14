@@ -30,10 +30,10 @@ test('fankuai resolves each cardinal model face independently instead of collaps
 test('runtime uses the original atlas and does not load expanded fankuai blocks', async () => {
   const engine = await read('engine.ts')
   const world = await read('world.ts')
-  assert.doesNotMatch(engine, /fankuai\\/blocks\\//)
+  assert.doesNotMatch(engine, /fankuai\/blocks\//)
   assert.doesNotMatch(world, /MINECRAFT_REGISTRY|BLOCK_META_BY_ID/)
   assert.match(world, /const TILE_COUNT = 16/)
-  assert.match(world, /export const BLOCKS = \\[GRASS, DIRT, STONE, SAND, WATER, LOG, LEAVES, PLANKS, COBBLE, GLASS\\] as const/)
+  assert.match(world, /export const BLOCKS = \[GRASS, DIRT, STONE, SAND, WATER, LOG, LEAVES, PLANKS, COBBLE, GLASS\] as const/)
 })
 
 test('standalone item PNG assets remain exported even though the backpack UI is removed', async () => {
