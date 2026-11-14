@@ -189,12 +189,12 @@ test('all item catalog display names are Chinese and internal English IDs are no
   assert.ok(!inventory.includes('{selectedItem.name} · 堆叠上限'))
 })
 
-test('every registered block gets a distinct three-face atlas tile in a 64 by 64 grid', async () => {
+test('every registered block gets a distinct three-face atlas tile in a dynamically sized grid', async () => {
   const world = await read('world.ts')
-  assert.ok(world.includes('const TILE_COUNT = 64'))
+  assert.match(world, /const TILE_COUNT = Math\.ceil\(Math\.sqrt\(12 \+ MINECRAFT_REGISTRY\.blocks\.length \* 3\)\)/)
   assert.ok(world.includes('const base = 12 + index * 3'))
   assert.ok(world.includes('getBlockTiles(b)'))
-  assert.ok(world.includes("new URL('vanilla-block-atlas.png?v=20261114-texture-fix-2', document.baseURI)"))
+  assert.ok(world.includes("new URL('vanilla-block-atlas.png?v=20261114-texture-fix-3', document.baseURI)"))
   assert.ok(world.includes('onAtlasReady'))
 })
 
