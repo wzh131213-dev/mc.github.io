@@ -219,7 +219,7 @@ test('core texture atlas fallbacks preserve recognizable block colors and PNG al
 
 test('inventory uses vanilla item PNGs instead of emoji or generated color placeholders', async () => {
   const inventory = await read('Inventory.tsx')
-  assert.ok(inventory.includes('minecraft-item-textures/'))
+  assert.ok(inventory.includes('fankuai/items/'))
   assert.ok(inventory.includes('<ItemTexture name={item.name}'))
   assert.ok(inventory.includes('onError={() => setFailed(true)}'))
   const builder = await read('scripts/build_texture_atlas.py')
