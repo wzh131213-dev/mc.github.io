@@ -45,8 +45,10 @@ def main():
             return {}
 
     def textures_for(model_id, stack=()):
+        if not model_id:
+            return {}
         key = model_id if ":" in model_id else f"minecraft:{model_id}"
-        if not model_id or key in stack:
+        if key in stack:
             return {}
         if key in model_cache:
             return model_cache[key]
