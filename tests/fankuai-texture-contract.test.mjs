@@ -38,8 +38,9 @@ test('runtime renders chunk-batched solid blocks with six independent directiona
   assert.match(world, /const md = isWater \? water : blockFaces!\[faceIndex\]/)
 })
 
-test('inventory icons load standalone PNGs from the fankuai items directory', async () => {
-  const inventory = await read('Inventory.tsx')
-  assert.match(inventory, /new URL\('fankuai\/items\/', document\.baseURI\)/)
-  assert.match(inventory, /itemTextureName\(name\)/)
+test('standalone item PNG assets remain exported even though the backpack UI is removed', async () => {
+  const builder = await read('scripts/build_fankuai_textures.py')
+  assert.match(builder, /shutil\.copytree\(texture_root \/ "item", item_out\)/)
+  const app = await read('App.tsx')
+  assert.doesNotMatch(app, /Inventory|inventoryOpen|openInventory/)
 })
