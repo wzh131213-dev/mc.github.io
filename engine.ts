@@ -294,7 +294,6 @@ export class Engine {
       this.yaw = 0.6
       this.pitch = 0
       this.spawned = true
-      this.monsters.spawnNear(s.x, s.z)
     }
     if (m === 'panorama') this.outline.visible = false
     this.applyFog()
