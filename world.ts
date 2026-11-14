@@ -310,7 +310,7 @@ export function getAtlas() {
   // 图集由构建工作流从带明确再分发许可的 26.3 资源包生成；本地开发无图集时保留独立备用纹理。
   if (!atlasLoadStarted) {
     atlasLoadStarted = true
-    const atlasUrl = new URL('vanilla-block-atlas.png', document.baseURI).toString()
+    const atlasUrl = new URL('vanilla-block-atlas.png?v=20261114-texture-fix-2', document.baseURI).toString()
     fetch(atlasUrl)
       .then((response) => {
         const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
