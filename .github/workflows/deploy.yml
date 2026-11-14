@@ -52,6 +52,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check pillow
           python scripts/build_texture_atlas.py
+          python scripts/build_fankuai_textures.py
       - name: Build Vite application
         run: npm run build
       - name: Verify build output
