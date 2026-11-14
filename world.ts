@@ -783,7 +783,6 @@ export class World {
     const x0 = cx * CS
     const z0 = cz * CS
     const aoV = [3, 3, 3, 3]
-    const faceIndexByNormal = [0, 1, 2, 3, 4, 5]
 
     for (let y = 0; y <= ch.maxY; y++) {
       for (let z = z0; z < z0 + CS; z++) {
@@ -823,8 +822,8 @@ export class World {
             for (let i = 0; i < 4; i++) {
               const corner = f.c[i]
               md.pos.push(x + corner[0], y + (corner[1] ? topH : 0), z + corner[2])
-              // Independent face images use the full 0..1 UV range.
-              md.uv.push(i === 1 || i === 2 ? 1 : 0, i >= 2 ? 1 : 0)
+              // Solid blocks use one independent image per face; water keeps atlas UVs.
+              md.uv.push(isWater ? (i === 1 || i === 2 ? u1 : u0) : (i === 1 || i === 2 ? 1 : 0), isWater ? (i >= 2 ? v1 : v0) : (i >= 2 ? 1 : 0))
               let brightness = f.shade
               if (useAO) {
                 const ao = this.ao(x + f.n[0], y + f.n[1], z + f.n[2], a1, a2, corner[a1] * 2 - 1, corner[a2] * 2 - 1)
