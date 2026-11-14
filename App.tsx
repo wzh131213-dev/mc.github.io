@@ -130,7 +130,7 @@ export default function App() {
     chunks: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 6 : 8,
   }))
   const [slot, setSlot] = useState(0)
-  const [hotbarBlocks, setHotbarBlocks] = useState<number[]>(readSavedHotbar)
+  const [hotbarBlocks] = useState<number[]>(readSavedHotbar)
   const [saveWarning, setSaveWarning] = useState(false)
   const [info, setInfo] = useState<InfoPayload>({ text: '', chunkText: '', underwater: false, fly: false })
   const [touch, setTouch] = useState(false)
