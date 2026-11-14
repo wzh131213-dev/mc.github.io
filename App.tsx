@@ -173,6 +173,14 @@ export default function App() {
 
   useEffect(() => {
     try {
+      window.localStorage.removeItem('mc-web-inventory:v1')
+    } catch {
+      // Ignore unavailable browser storage.
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
       window.localStorage.setItem(HOTBAR_STORAGE_KEY, JSON.stringify(hotbarBlocks))
     } catch {
       setSaveWarning(true)
