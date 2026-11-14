@@ -584,65 +584,8 @@ export class World {
   }
 
   private generateChunk(cx: number, cz: number) {
-    const ch = new Chunk(cx, cz)
-    const x0 = cx * CS
-    const z0 = cz * CS
-    const M = TREE_MARGIN
-    const W = CS + M * 2
-    const hs = new Int16Array(W * W)
-    for (let lz = 0; lz < W; lz++) for (let lx = 0; lx < W; lx++) hs[lz * W + lx] = this.heightAt(x0 - M + lx, z0 - M + lz)
-
-    let maxY = 0
-    const d = ch.data
-    for (let z = 0; z < CS; z++) {
-      for (let x = 0; x < CS; x++) {
-        const h = hs[(z + M) * W + x + M]
-        const sandy = h <= SEA + 1
-        const rocky = h >= 43
-        for (let y = 0; y <= h; y++) {
-          let b = STONE
-          if (y === h) b = sandy ? SAND : rocky ? STONE : GRASS
-          else if (y >= h - 3 && !rocky) b = sandy ? SAND : DIRT
-          d[(y * CS + z) * CS + x] = b
-        }
-        for (let y = h + 1; y <= SEA; y++) d[(y * CS + z) * CS + x] = WATER
-        maxY = Math.max(maxY, h, h < SEA ? SEA : 0)
-      }
-    }
-
-    // 树:检查区块外 2 格内的树根,把落进本区块的树干、树叶补上
-    const trees: number[][] = []
-    for (let lz = 0; lz < W; lz++) {
-      for (let lx = 0; lx < W; lx++) {
-        const h = hs[lz * W + lx]
-        const th = this.treeAt(x0 - M + lx, z0 - M + lz, h)
-        if (th) trees.push([x0 - M + lx, z0 - M + lz, h, th])
-      }
-    }
-    const put = (wx: number, y: number, wz: number, b: number, onlyAir: boolean) => {
-      const lx = wx - x0
-      const lz = wz - z0
-      if (lx < 0 || lx >= CS || lz < 0 || lz >= CS || y < 0 || y >= SY) return
-      const i = (y * CS + lz) * CS + lx
-      if (onlyAir && d[i] !== AIR) return
-      d[i] = b
-      if (y > maxY) maxY = y
-    }
-    for (const [x, z, h, th] of trees) for (let y = 1; y <= th; y++) put(x, h + y, z, LOG, false)
-    for (const [x, z, h, th] of trees) {
-      const top = h + th
-      for (let dy = -2; dy <= 1; dy++) {
-        const r = dy <= -1 ? 2 : 1
-        for (let dz = -r; dz <= r; dz++) {
-          for (let dx = -r; dx <= r; dx++) {
-            if (Math.abs(dx) === r && Math.abs(dz) === r && (dy >= 0 || hash3(x + dx, top + dy, z + dz, this.seed + 11) < 0.45)) continue
-            put(x + dx, top + dy, z + dz, LEAVES, true)
-          }
-        }
-      }
-    }
-    ch.maxY = maxY
-    return ch
+    // 当前版本保留世界/渲染接口，但不再生成地形、树木、水体或任何方块。
+    return new Chunk(cx, cz)
   }
 
   /* ------------------------------ 区块存取 ------------------------------ */
@@ -741,22 +684,8 @@ export class World {
   }
 
   findSpawn() {
-    for (let r = 0; r < 160; r++) {
-      for (let dz = -r; dz <= r; dz++) {
-        for (let dx = -r; dx <= r; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue
-          const h = this.heightAt(dx, dz)
-          if (h <= SEA + 1 || h >= 43) continue
-          for (let y = SY - 1; y >= 0; y--) {
-            const b = this.get(dx, y, dz)
-            if (b === AIR) continue
-            if (b === GRASS) return { x: dx + 0.5, y: y + 1, z: dz + 0.5 }
-            break
-          }
-        }
-      }
-    }
-    return { x: 0.5, y: SY - 1, z: 0.5 }
+    // 空世界中将玩家放在安全高度；由飞行模式维持移动，不依赖地面方块。
+    return { x: 0.5, y: 80, z: 0.5 }
   }
 
   /* ------------------------------ 网格化 ------------------------------ */
