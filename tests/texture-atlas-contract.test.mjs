@@ -33,8 +33,9 @@ test('atlas build reports unresolved vanilla blocks rather than silently hiding 
 
 test('legacy core block textures are resolved from their exact vanilla model faces', async () => {
   const builder = await read('scripts/build_texture_atlas.py')
-  assert.match(builder, /"grass_block":/)
-  assert.match(builder, /"oak_log":/)
-  assert.match(builder, /"stone":/)
-  assert.match(builder, /"dirt":/)
+  assert.match(builder, /"grass_block_top":/)
+  assert.match(builder, /"grass_block_side":/)
+  assert.match(builder, /"oak_log_top"/)
+  assert.match(builder, /"stone"/)
+  assert.match(builder, /"dirt"/)
 })
